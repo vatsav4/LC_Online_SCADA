@@ -1,80 +1,67 @@
 # Line 2 Torque Dashboard
 
-A standalone live dashboard for the second line. It runs separately from the existing line's
-dashboard and has its own database server, its own config and its own port.
+A Flask dashboard for Line 2. It follows the same pattern as `andon_dashboard` in the Online-SCADA repo:
+- a single `app.py` with a background poll thread
+- settings in `config.ini`
+- the navy/gold look, with green/red tiles and SPA-style navigation
 
-## Data sources
-
-| Table | Purpose |
+| All stations | Station detail |
 |---|---|
-| `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | Which vehicle is at each station right now |
-| `smartapp_linedata_line_log_dump` (`id`, `in_date_time`, `mat_no`, `type_data`, `data`, `shop_id_id`, …) | One row per tightening tool event. `type_data` is the tool tag (T37…), and `data` is a JSON payload |
+| ![Overview](docs/overview.png) | ![Station](docs/station1.png) |
 
-Example `data` payload:
+## Data sources (Line-2 SQL Server, port 49561)
+
+| Table | Used for |
+|---|---|
+| `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | Vehicle currently at each station, shown in the VC and MAT plates |
+| `smartapp_linedata_line_log_dump` (`mat_no`, `type_data`, `data`, `in_date_time`, `shop_id_id`) | One row per tightening tool. `type_data` is the tool tag and `data` is a JSON payload |
 
 ```json
 {"Name":"ST08 50Nm T37 Steering pressure line to return lin", "MAT":"MAT513357TFJ12781",
- "Station No":"STATION 8","Operator":"","Mode":"ACTIVE","Set Count":+2,"Actual Count":+10,"Status":"OK"}
+ "Station No":"STATION 8","Mode":"ACTIVE","Set Count":+2,"Actual Count":+10,"Status":"OK"}
 ```
 
-`+2` is not valid JSON, so SQL Server's `JSON_VALUE`/`OPENJSON` can't read it. The payload is
-parsed in Python instead (`parser.py`), and the parser tolerates these values.
+`+2` is not valid JSON, so SQL Server's `JSON_VALUE` can't read it. The payload is parsed in Python.
 
-### How a station card is built
+How a station page is built:
+1. The station's current MAT is joined to the log. Trailing spaces in `mat_no` are ignored by SQL Server's `=`.
+2. Only rows whose `"Station No"` is this station are kept, and only the newest row per tool tag.
+3. Each tool box shows its title and torque. The title comes from `Name`, e.g. "T37: Steering pressure line to return lin", and the torque (50 Nm) is shown as a chip. The box also shows Set and Actual Count and a progress bar, plus a BYPASS chip when the mode is BYPASS.
+4. A tool is green when `Status` is `OK` and red otherwise. If `Status` is missing, it is red when Actual < Set.
+5. A station tile is green when every tool is OK, red when any tool isn't, and grey when no data exists yet for that vehicle.
 
-1. Every `Station_Mapping` row is `LEFT JOIN`ed to the log on `mat_no = MAT_Number`. Trailing
-   spaces in `mat_no` are ignored by SQL Server's `=`.
-2. Only rows whose `"Station No"` matches the card's station are kept (`STRICT_STATION_MATCH`).
-   Earlier stations' records for the same vehicle don't leak onto the card.
-3. For each tool tag, only the latest record is shown.
-4. Station status: **NOT OK** if any tool is NOT OK, **OK** if all are OK, **WAITING** if no data has arrived yet.
-   Tools in **BYPASS** mode are highlighted and counted in the header.
+Pages refresh every 2 s. When a new vehicle arrives at a station, the plates and tool boxes switch to it automatically.
 
-A live event feed on the right shows the latest log rows across the line.
-
-![Demo screenshot](screenshot-demo.png)
-
-## Connecting to the Line 2 SQL Server (port 49561)
-
-This server only accepts connections on port **49561** at its own IP. SQL Server connection strings
-separate the port with a **comma**, not a colon:
-
-```
-SERVER=172.25.208.39,49561     (SSMS "Server name" uses the same form)
-```
-
-This is set through `DB_HOST` and `DB_PORT` in `.env`. The SQL Browser service and the default port 1433 are not used.
-
-If the connection fails:
-- Check that the port is open from the dashboard PC: `Test-NetConnection 172.25.208.39 -Port 49561` (PowerShell).
-- With ODBC Driver 18, keep `DB_ENCRYPT=false` or install a trusted cert. The app already sends `TrustServerCertificate=yes`.
-- `GET /health` reports whether the DB is reachable and which server/port is in use.
-
-## Run
+## Setup
 
 ```bash
-pip install -r line2_dashboard/requirements.txt
-cp line2_dashboard/.env.example line2_dashboard/.env   # then edit credentials
-python -m line2_dashboard.app                          # from the repository root
+pip install -r requirements.txt
+copy config.ini.example config.ini     # fill in server / password
+python app.py                          # run from inside line2_dashboard/
 ```
 
-Open `http://<pc>:5002/`. To try it without the database, set `DEMO_MODE=true`. Demo mode uses rows copied from the real tables.
+Open `http://<pc>:5001/`. The andon dashboard uses port 5000, so this one defaults to 5001.
 
-## Configuration (`.env`)
+### Port 49561
 
-| Key | Default | Notes |
-|---|---|---|
-| `DB_HOST` / `DB_PORT` | – / `49561` | Line 2 SQL Server |
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `Industry4_157`, `sa`, – | |
-| `DB_BACKEND` | `pyodbc` | or `pymssql` if the ODBC driver can't be installed |
-| `MAPPING_TABLE`, `LOG_TABLE` | see above | `db.schema.table` |
-| `SHOP_ID` | empty | filter log rows by `shop_id_id` if the table is shared between lines |
-| `LOOKBACK_HOURS` | `0` | limit the log scan if the table grows large |
-| `STRICT_STATION_MATCH` | `true` | show only records logged at that station |
-| `REFRESH_SECONDS` | `5` | browser poll interval |
-| `PORT` | `5002` | web port, kept different from the other line's dashboard |
+SQL Server expects the port after a **comma**, so the app connects with `SERVER=<ip>,49561`. Set `server` and
+`port` in the `[SQL_LINE]` section of `config.ini`. SSMS takes the same form in its "Server name" box.
 
-If the log table gets large, add an index to keep the join fast:
+If it shows *Offline*:
+- Check the port from the dashboard PC: `Test-NetConnection 172.25.208.39 -Port 49561`
+- Check that the ODBC driver named in `[ODBC] driver` is installed.
+
+### Options
+
+| Setting | Purpose |
+|---|---|
+| `[MAIN] demo_mode = true` | Run on built-in sample rows without a database |
+| `[MAIN] chassis_image` | Picture on the station page. Drop your own `chassis.png` into `static/` and set it here |
+| `[FILTER] shop_id` | Only read log rows for this `shop_id_id` if the table is shared with other lines |
+| `STATION_TOOLS` in `app.py` | Optional list of expected tool tags per station. Missing tools show as red "Awaiting data" boxes |
+| `static/logo.png` | Company logo in the top bar (same file as the andon dashboard) |
+
+If the log table grows large, this index keeps the poll fast:
 
 ```sql
 CREATE INDEX IX_line_log_dump_mat_time ON dbo.smartapp_linedata_line_log_dump (mat_no, in_date_time DESC);
@@ -82,6 +69,5 @@ CREATE INDEX IX_line_log_dump_mat_time ON dbo.smartapp_linedata_line_log_dump (m
 
 ## API
 
-- `GET /api/line`: all stations with their current vehicle, tool records, status and a summary
-- `GET /api/events?limit=50`: latest log events
-- `GET /health`: DB connectivity check
+- `GET /api/status`: all stations with their status, MAT and OK tool counts
+- `GET /api/station/<n>`: VC, MAT, status and tool list for one station

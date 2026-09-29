@@ -1,6 +1,7 @@
 """Sample rows (taken from the real tables) so the dashboard can run without the database.
 
-Enable with DEMO_MODE=1.
+Enable with demo_mode = true in config.ini. Station 1 mirrors the layout mock-up
+(T1 SG / T2 Tail / T3 Nylon tightening).
 """
 from datetime import datetime, timedelta
 
@@ -22,6 +23,9 @@ MAPPING = [
 ]
 
 _LOG = [
+    ("MAT784062TFJ12788", "T1", '{"Name":"ST01 T1 SG Tightening", "MAT":"MAT784062TFJ12788", "Station No":"STATION 1","Operator":"","Mode":"ACTIVE","Set Count":+5,"Actual Count":+5,"Status":"OK"}'),
+    ("MAT784062TFJ12788", "T2", '{"Name":"ST01 T2 Tail Tightening", "MAT":"MAT784062TFJ12788", "Station No":"STATION 1","Operator":"","Mode":"ACTIVE","Set Count":+5,"Actual Count":+0,"Status":"NOT OK"}'),
+    ("MAT784062TFJ12788", "T3", '{"Name":"ST01 T3 Nylon Tightening", "MAT":"MAT784062TFJ12788", "Station No":"STATION 1","Operator":"","Mode":"ACTIVE","Set Count":+5,"Actual Count":+3,"Status":"NOT OK"}'),
     ("MAT513357TFJ12781", "T37", '{"Name":"ST08 50Nm T37 Steering pressure line to return lin", "MAT":"MAT513357TFJ12781", "Station No":"STATION 8","Operator":"","Mode":"ACTIVE","Set Count":+2,"Actual Count":+10,"Status":"OK"}'),
     ("MAT513357TFJ12779", "T38", '{"Name":"ST10  T38 80Nm urea tank fitment", "MAT":"MAT513357TFJ12779", "Station No":"STATION 10","Operator":"","Mode":"BYPASS","Set Count":+6,"Actual Count":+6,"Status":"OK"}'),
     ("MAT784062TFJ12787", "T39", '{"Name":"ST02 86Nm T39 EGP clamp bolt tightening torque", "MAT":"MAT784062TFJ12787", "Station No":"STATION 2","Operator":"","Mode":"BYPASS","Set Count":+2,"Actual Count":+11,"Status":"OK"}'),
@@ -59,6 +63,3 @@ def station_rows():
         rows.extend({**base, **log} for log in matches)
     return rows
 
-
-def recent_events(limit):
-    return _log_rows()[:limit]

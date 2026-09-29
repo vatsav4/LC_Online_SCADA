@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Torque Dashboard{% endblock %} | Line 2</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a href="{{ url_for('index') }}" class="brand-link" title="Home">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Company Logo" class="brand-logo"
+           onerror="this.style.display='none'">
+    </a>
+    <div class="center-title">{% block center_title %}{% endblock %}</div>
+    <div class="right-title">
+      {{ line_title }}
+      <span class="conn {{ 'conn-ok' if db_ok else 'conn-down' }}" id="conn">
+        <span class="conn-dot"></span><span id="conn-text">{{ 'Online' if db_ok else 'Offline' }}</span>
+      </span>
+      {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
+    </div>
+  </header>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer-bar">&copy; TMCVL Dharwad - Maintenance Team</footer>
+
+  {% block scripts %}{% endblock %}
+
+  <!-- spa.js swaps .content / titles on navigation instead of a full reload. -->
+  <script src="{{ url_for('static', filename='spa.js') }}"></script>
+</body>
+</html>

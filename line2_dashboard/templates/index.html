@@ -1,45 +1,29 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ line_name }} Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-</head>
-<body data-refresh="{{ refresh_seconds }}">
-  <header class="topbar">
-    <div class="title">
-      <h1>{{ line_name }} &middot; Torque Monitoring</h1>
-      <span id="demo-badge" class="badge badge-demo" hidden>DEMO DATA</span>
-    </div>
-    <div class="summary" id="summary">
-      <div class="kpi"><span class="kpi-value" id="kpi-stations">–</span><span class="kpi-label">Stations</span></div>
-      <div class="kpi ok"><span class="kpi-value" id="kpi-ok">–</span><span class="kpi-label">OK</span></div>
-      <div class="kpi bad"><span class="kpi-value" id="kpi-not-ok">–</span><span class="kpi-label">Not OK</span></div>
-      <div class="kpi idle"><span class="kpi-value" id="kpi-waiting">–</span><span class="kpi-label">Waiting</span></div>
-      <div class="kpi warn"><span class="kpi-value" id="kpi-bypass">–</span><span class="kpi-label">Bypass tools</span></div>
-    </div>
-    <div class="conn">
-      <span id="conn-dot" class="dot"></span>
-      <span id="conn-text">Connecting…</span>
-    </div>
-  </header>
+{% extends "base.html" %}
+{% block title %}All Stations{% endblock %}
+{% block center_title %}All Stations{% endblock %}
 
-  <div id="error-banner" class="error-banner" hidden></div>
+{% block content %}
+<div class="legend">
+  <span><i class="swatch tile-green"></i>All tools OK</span>
+  <span><i class="swatch tile-red"></i>Tool NOT OK / pending</span>
+  <span><i class="swatch tile-idle"></i>No tightening data yet</span>
+  <span class="updated" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</span>
+</div>
 
-  <main class="layout">
-    <section>
-      <div class="filters">
-        <label><input type="checkbox" id="only-problems"> Show only NOT OK stations</label>
-      </div>
-      <div id="stations" class="station-grid"></div>
-    </section>
-    <aside class="events">
-      <h2>Live events</h2>
-      <ol id="events"></ol>
-    </aside>
-  </main>
+<div class="station-grid" id="station-grid">
+  {% for st in stations %}
+  <a class="station-tile tile-{{ st.status }}" id="station-tile-{{ st.id }}"
+     href="{{ url_for('station', station_id=st.id) }}">
+    <span class="tile-name">Station - {{ st.id }}</span>
+    <span class="tile-mat">{{ st.mat_number or '—' }}</span>
+    <span class="tile-count">{{ st.ok }}/{{ st.total }} tools OK</span>
+  </a>
+  {% else %}
+  <p class="placeholder-note">Waiting for data from Station_Mapping…</p>
+  {% endfor %}
+</div>
+{% endblock %}
 
-  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='overview.js') }}"></script>
+{% endblock %}

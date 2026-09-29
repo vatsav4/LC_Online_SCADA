@@ -1,0 +1,27 @@
+; Copy this file to config.ini and fill in real values.
+; config.ini is gitignored so credentials never get committed.
+
+[SQL_LINE]
+; Line-2 SQL Server only listens on this non-default port.
+server = 172.25.208.39
+port = 49561
+database = Industry4_157
+username = CHANGE_ME
+password = CHANGE_ME
+
+[ODBC]
+driver = ODBC Driver 18 for SQL Server
+
+[FILTER]
+; Optional: only read log rows with this shop_id_id (leave empty for all).
+shop_id =
+
+[MAIN]
+poll_interval = 2
+; 5000 is used by the Line-3 andon dashboard.
+web_port = 5001
+line_title = Line - 2 | Assembly Shop
+; Image in static/ shown on the station page (e.g. chassis.png).
+chassis_image = chassis.svg
+; true = run on built-in sample rows, no database needed.
+demo_mode = false

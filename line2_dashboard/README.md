@@ -9,6 +9,13 @@ A Flask dashboard for Line 2. It follows the same pattern as `andon_dashboard` i
 |---|---|
 | ![Overview](docs/overview.png) | ![Station](docs/station1.png) |
 
+There are two interchangeable data sources, chosen with `[MAIN] source` in `config.ini`. Both feed the same pages:
+
+| `source =` | Reads from | Use when |
+|---|---|---|
+| `sql` (default) | `Station_Mapping` + the log table on the Line-2 SQL Server | Working from logged data |
+| `opcua` | Live tags on the SCADA's OPC UA server | Showing the SCADA's live status directly |
+
 ## Data sources (Line-2 SQL Server, port 49561)
 
 | Table | Used for |
@@ -66,6 +73,40 @@ If the log table grows large, this index keeps the poll fast:
 ```sql
 CREATE INDEX IX_line_log_dump_mat_time ON dbo.smartapp_linedata_line_log_dump (mat_no, in_date_time DESC);
 ```
+
+## Reading live SCADA tags (`source = opcua`)
+
+The dashboard talks to the SCADA's **OPC UA server**. WinCC, Ignition, AVEVA/Wonderware, iFIX and Kepware all
+provide one, usually on `opc.tcp://<scada-ip>:4840`. The PLCs on the line are never contacted directly,
+so it doesn't matter that there are several of them.
+
+**Why it doesn't slow the SCADA down:**
+- **One session and one subscription** for the whole dashboard. Browsers only read the Flask server's memory, so 1 or 50 screens cost the SCADA the same.
+- **Report-by-exception:** the SCADA sends a tag only when its value changes, sampled no faster than
+  `publishing_interval_ms` (default 1000 ms). Nothing is polled.
+- **Read-only:** nothing is ever written to the SCADA.
+- **One tiny keepalive read every 15 s.** On a disconnect the dashboard shows *Offline*, keeps the last values on screen and retries every `retry_seconds`.
+
+### Setup
+1. On the SCADA, enable its OPC UA server and create a read-only user. How depends on the product; for WinCC it's in the OPC UA settings of the runtime.
+2. List the tag node ids:
+   ```
+   python opcua_browse.py opc.tcp://<scada-ip>:4840 --start "<folder node id>" > tags.csv
+   ```
+3. Copy `tag_map.csv.example` to `tag_map.csv`. Add one row per tag, using `kind` = `vc`, `mat`, `set`, `actual`, `status` or `mode`:
+   ```
+   station,kind,tool,node_id,label,torque_nm
+   1,mat,,ns=2;s=Line2.ST01.MAT_Number,,
+   1,set,T1,ns=2;s=Line2.ST01.T1.SetCount,SG Tightening,
+   1,actual,T1,ns=2;s=Line2.ST01.T1.ActualCount,,
+   1,status,T1,ns=2;s=Line2.ST01.T1.OK,,
+   ```
+   - **`status`** is optional. Without it, a tool is red while Actual < Set. With it, `ok_values` in `config.ini` decides which values count as OK (default `1,true,ok`), and `bypass_values` does the same for the `mode` tag.
+   - **VC/MAT:** if they aren't SCADA tags, set `mat_from_sql = true` to take them from `Station_Mapping`.
+4. In `config.ini`, set `[MAIN] source = opcua` and fill in the `[OPCUA]` section. Then run `pip install asyncua` and `python app.py`.
+
+To try it without the SCADA, run `python opcua_simulator.py`. It serves the tags in `tag_map.csv.example` with
+changing counts; point `endpoint` at `opc.tcp://127.0.0.1:4840/`.
 
 ## API
 

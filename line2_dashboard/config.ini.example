@@ -17,6 +17,9 @@ driver = ODBC Driver 18 for SQL Server
 shop_id =
 
 [MAIN]
+; sql   = read Station_Mapping + log table (SQL section above)
+; opcua = read live tags from the SCADA's OPC UA server (OPCUA section below)
+source = sql
 poll_interval = 2
 ; 5000 is used by the Line-3 andon dashboard.
 web_port = 5001
@@ -25,3 +28,21 @@ line_title = Line - 2 | Assembly Shop
 chassis_image = chassis.svg
 ; true = run on built-in sample rows, no database needed.
 demo_mode = false
+
+[OPCUA]
+; Only used when [MAIN] source = opcua.
+endpoint = opc.tcp://SCADA_IP:4840
+; Leave empty for anonymous login.
+username =
+password =
+; Empty = no security. Otherwise e.g. Basic256Sha256,SignAndEncrypt,client_cert.der,client_key.pem
+security =
+; SCADA pushes changes no faster than this (1000 ms is plenty for a display).
+publishing_interval_ms = 1000
+retry_seconds = 10
+tag_map = tag_map.csv
+; Values of a status tag that mean OK, and of a mode tag that mean BYPASS.
+ok_values = 1,true,ok
+bypass_values = 1,true,bypass
+; true = VC/MAT come from SQL Station_Mapping when tag_map.csv has no vc/mat rows.
+mat_from_sql = false

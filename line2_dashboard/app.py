@@ -1,7 +1,12 @@
 """
 Line-2 torque dashboard.
 
-One SQL Server (only reachable on a non-default port, e.g. 49561):
+Two interchangeable data sources, chosen with [MAIN] source in config.ini:
+  source = sql    -> the SQL tables below (default)
+  source = opcua  -> live SCADA tags over OPC UA, see opcua_source.py / tag_map.csv
+Both produce the same station/tool snapshot, so the pages are identical.
+
+SQL source - one SQL Server (only reachable on a non-default port, e.g. 49561):
   SQL_LINE -> Industry4_157.dbo.Station_Mapping
                 (StationNumber, VC_Number, MAT_Number - vehicle at each station)
            -> Industry4_157.dbo.smartapp_linedata_line_log_dump
@@ -61,6 +66,22 @@ WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon das
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
 CHASSIS_IMAGE = _get("MAIN", "chassis_image", "chassis.svg")  # file in static/
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
+SOURCE = _get("MAIN", "source", "sql").strip().lower()  # "sql" or "opcua"
+
+OPCUA = {
+    "endpoint": _get("OPCUA", "endpoint", "opc.tcp://127.0.0.1:4840"),
+    "username": _get("OPCUA", "username", "").strip() or None,
+    "password": _get("OPCUA", "password", ""),
+    # e.g. "Basic256Sha256,SignAndEncrypt,client_cert.der,client_key.pem"; empty = no security
+    "security": _get("OPCUA", "security", "").strip() or None,
+    "publishing_interval_ms": int(_get("OPCUA", "publishing_interval_ms", "1000")),
+    "retry_seconds": int(_get("OPCUA", "retry_seconds", "10")),
+    "tag_map": os.path.join(os.path.dirname(__file__), _get("OPCUA", "tag_map", "tag_map.csv")),
+    "ok_values": [v.strip() for v in _get("OPCUA", "ok_values", "1,true,ok").split(",")],
+    "bypass_values": [v.strip() for v in _get("OPCUA", "bypass_values", "1,true,bypass").split(",")],
+    # Take VC/MAT from SQL Station_Mapping for stations whose VC/MAT are not in tag_map.csv.
+    "mat_from_sql": _get("OPCUA", "mat_from_sql", "false").strip().lower() in ("1", "true", "yes", "on"),
+}
 
 # Optional: only read log rows for this shop_id_id (if the log table is shared between lines).
 SHOP_ID = _get("FILTER", "shop_id", "").strip() or None
@@ -267,13 +288,54 @@ def load_rows():
         conn.close()
 
 
+def fetch_mapping():
+    """Station -> VC/MAT from Station_Mapping (14 rows; used only by the OPC UA source)."""
+    conn = connect(LINE_DB)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT StationNumber, VC_Number, MAT_Number FROM dbo.Station_Mapping")
+        return {int(r[0]): {"vc_number": str(r[1] or "").strip(), "mat_number": str(r[2] or "").strip()}
+                for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+opcua_source = None  # OpcUaSource instance when SOURCE == "opcua"
+opcua_tag_map = []
+
+
+def start_opcua():
+    global opcua_source, opcua_tag_map
+    from opcua_source import OpcUaSource, load_tag_map
+
+    opcua_tag_map = load_tag_map(OPCUA["tag_map"])
+    opcua_source = OpcUaSource(
+        OPCUA["endpoint"], [r["node_id"] for r in opcua_tag_map],
+        username=OPCUA["username"], password=OPCUA["password"], security=OPCUA["security"],
+        publishing_interval_ms=OPCUA["publishing_interval_ms"], retry_seconds=OPCUA["retry_seconds"],
+    ).start()
+
+
+def load_stations():
+    """Latest stations from whichever source is configured. Returns (stations, source_ok)."""
+    if SOURCE == "opcua":
+        from opcua_source import build_stations_from_tags
+
+        values, updated, connected = opcua_source.snapshot()
+        mapping = fetch_mapping() if OPCUA["mat_from_sql"] else None
+        stations = build_stations_from_tags(opcua_tag_map, values, updated, mapping,
+                                            OPCUA["ok_values"], OPCUA["bypass_values"])
+        return stations, connected
+    return build_stations(load_rows(), STATION_TOOLS), True
+
+
 def poll_once():
     try:
-        stations = build_stations(load_rows(), STATION_TOOLS)
+        stations, source_ok = load_stations()
         with state_lock:
             state["stations"] = stations
             state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-            state["db_ok"] = True
+            state["db_ok"] = source_ok
     except Exception as e:
         logger.error(f"Poll failed: {e}")
         with state_lock:
@@ -340,5 +402,7 @@ def api_station(station_id):
 
 
 if __name__ == "__main__":
+    if SOURCE == "opcua":
+        start_opcua()
     threading.Thread(target=poll_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=WEB_PORT, threaded=True)

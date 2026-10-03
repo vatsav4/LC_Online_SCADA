@@ -1,0 +1,47 @@
+Option Explicit
+Function action
+            
+
+    Dim SCAN_VC1
+    Dim SCAN_MAT1
+    Dim l_StrTmp
+    Dim i
+    Dim Command
+
+    Local_Connection_Init
+    Local_Connection.Open
+
+    For i = 1 To 17
+
+        ' Read VIN
+        Set SCAN_VC1 = HMIRuntime.Tags("STATION" & i & ".VC")
+        SCAN_VC1.Read
+
+        ' Read MAT
+        Set SCAN_MAT1 = HMIRuntime.Tags("STATION" & i & ".MAT")
+        SCAN_MAT1.Read
+
+        ' Build SQL Query
+        l_StrTmp = "UPDATE Station_Mapping SET " & _
+                   "VC_Number= '" & SCAN_VC1.Value & "', " & _
+                   "MAT_Number= '" & SCAN_MAT1.Value & "' " & _
+                   "WHERE StationNumber = " & i
+
+        HMIRuntime.Trace l_StrTmp & vbCrLf
+        
+        'Msgbox l_StrTmp
+
+        Set Command = CreateObject("ADODB.Command")
+        With Command
+            .ActiveConnection = Local_Connection
+            .CommandText = l_StrTmp
+        End With
+
+        Command.Execute
+
+	Next
+
+    Local_Connection.Close 
+
+
+End Function

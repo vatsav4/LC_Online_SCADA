@@ -25,9 +25,13 @@ If you use a different column name, change `BYPASS_COLUMN` at the top of the scr
 
 ## Install
 
-1. WinCC Explorer → Global Script → **VBS Editor** → *Actions* → new action `Torques_To_SQL`.
-2. Paste `Torques_To_SQL_Action.vbs`. Set the **Trigger** to *Cyclic*, standard cycle **2 s**. Save.
-3. At the top of the script, set **`User ID` and `Password`** in `CONN_STR` (the server `172.25.208.39,49561` is
+1. WinCC Explorer → Global Script → **VBS Editor** → *Actions* → new action. The editor creates a `.bac` file.
+   Don't rename the `.vbs` file to `.bac`: a `.bac` also stores the trigger and isn't plain text.
+2. Select all of the editor's template text, then paste the whole `Torques_To_SQL_Action.vbs` over it.
+   It already contains `Option Explicit` and `Function action … End Function`.
+3. Run the editor's syntax check. Set the **Trigger** (Info/Trigger → Timer → *Cyclic*, standard cycle **2 s**).
+   Save as `Torques_To_SQL.bac`.
+4. At the top of the script, set **`User ID` and `Password`** in `CONN_STR` (the server `172.25.208.39,49561` is
    already filled in; keep the comma before the port). Also check `TOOL_COUNT`, the number of wrenches `SA_T1 … SA_T42`.
 
 The script uses its **own** SQL connection, not the shared `Local_Connection` of the Station_Mapping script (`VB_S`),

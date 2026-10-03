@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 line2_dashboard/config.ini
+# runtime data: layouts edited by managers, user accounts, uploaded pictures
+line2_dashboard/data/

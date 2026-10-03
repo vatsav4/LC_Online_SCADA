@@ -63,3 +63,42 @@ def station_rows():
         rows.extend({**base, **log} for log in matches)
     return rows
 
+
+
+# ---- source = torques (Torques_Actual_Data written by the WinCC script) ----
+
+_TORQUES = {
+    # T_No: (T_Name, Set_Counts, Actual_Counts, Active_Bypass)
+    "T1": ("SG Tightening", 5, 5, 0),
+    "T2": ("Tail Tightening", 5, 0, 0),
+    "T3": ("Nylon Tightening", 5, 3, 0),
+    "T15": ("DDU metal pipe", 3, 4, 1),
+    "T18": ("ARB bolt fitment", 4, 0, 0),
+    "T19": ("Front/rear axle brake hose", 1, 8, 0),
+    "T21": ("Steering line", 1, 0, 1),
+    "T23": ("Front/rear ARB", 4, 0, 0),
+    "T24": ("Clutch bundy", 1, 2, 1),
+    "T26": ("Brake hose adapter maxicab", 2, 2, 1),
+    "T37": ("Steering pressure line to return line", 2, 10, 0),
+    "T38": ("Urea tank fitment", 6, 6, 1),
+    "T39": ("EGP clamp bolt", 2, 11, 1),
+    "T40": ("Air tank assy with mtg bkt", 4, 10, 1),
+    "T41": ("Fuel tank mounting bracket", 4, 4, 1),
+    "T42": ("Clutch booster hose connection", 1, 0, 0),
+}
+
+
+def mapping_rows():
+    return [{"StationNumber": s, "VC_Number": vc, "MAT_Number": mat} for s, vc, mat in MAPPING]
+
+
+def torque_rows():
+    """Counts move with the clock so the demo looks live (T2 and T3 count up and reset)."""
+    tick = int(datetime.now().timestamp() // 3)
+    rows = []
+    for t_no, (name, set_c, actual, bypass) in _TORQUES.items():
+        if t_no in ("T2", "T3"):
+            actual = (tick + (0 if t_no == "T2" else 3)) % (set_c + 2)
+        rows.append({"T_No": t_no, "T_Name": name, "Set_Counts": set_c,
+                     "Actual_Counts": actual, "Active_Bypass": bypass})
+    return rows

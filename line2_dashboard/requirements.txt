@@ -1,3 +1,2 @@
 Flask
 pyodbc
-asyncua    # only needed for source = opcua

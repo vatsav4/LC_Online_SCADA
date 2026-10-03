@@ -6,6 +6,9 @@
 <div class="page-toolbar">
   <a href="{{ url_for('index') }}" class="home-button">&larr; Home</a>
   <div class="station-nav">
+    {% if user %}
+    <button type="button" class="nav-button edit-button" id="edit-toggle">&#9998; Edit layout</button>
+    {% endif %}
     {% if station_id > 1 %}
     <a href="{{ url_for('station', station_id=station_id - 1) }}" class="nav-button">&lsaquo; Station {{ station_id - 1 }}</a>
     {% endif %}
@@ -15,11 +18,6 @@
   </div>
 </div>
 
-<!--
-  Everything below is (re)drawn by station.js from /api/station/<id> every
-  poll, so a new vehicle arriving at the station swaps plates and tools live.
-  The server renders the first paint so the page is never blank.
--->
 <section class="plates">
   <div class="plate">
     <div class="plate-label">VC NUMBER</div>
@@ -31,34 +29,54 @@
   </div>
 </section>
 
-<section class="chassis-wrap">
-  <div class="status-ribbon ribbon-{{ st.status if st else 'idle' }}" id="status-ribbon">
-    {% if not st or not st.tools %}NO TIGHTENING DATA YET
-    {% elif st.status == 'green' %}ALL TOOLS OK
-    {% else %}{{ st.tools | rejectattr('status', 'equalto', 'OK') | list | length }} TOOL(S) NOT OK{% endif %}
+<!-- Layout editor (line managers only). Filled in by station.js. -->
+<section class="editor-bar" id="editor-bar" hidden>
+  <div class="editor-group">
+    <label for="add-tool">Add wrench</label>
+    <select id="add-tool"></select>
+    <button type="button" class="nav-button" id="add-tool-btn">Add</button>
   </div>
-  <img src="{{ url_for('static', filename=chassis_image) }}" alt="Chassis" class="chassis-img">
+  <div class="editor-group">
+    <label for="image-select">Chassis picture</label>
+    <select id="image-select"></select>
+    <label class="nav-button upload-button">Upload…<input type="file" id="image-upload" accept=".png,.jpg,.jpeg,.webp" hidden></label>
+  </div>
+  <p class="editor-hint">Drag the circles onto the torque points. Changes are only kept after <b>Save</b>.</p>
+  <div class="editor-actions">
+    <span class="editor-msg" id="editor-msg"></span>
+    <button type="button" class="nav-button" id="edit-cancel">Cancel</button>
+    <button type="button" class="home-button" id="edit-save">Save layout</button>
+  </div>
 </section>
 
-<section class="tool-grid" id="tool-grid">
-  {% for t in (st.tools if st else []) %}
-  <div class="tool-box {{ 'tile-green' if t.status == 'OK' else 'tile-red' }}{{ ' tool-pending' if t.status == 'PENDING' else '' }}">
-    <div class="tool-title">{{ t.tag }}: {{ t.label }}</div>
-    <div class="tool-meta">
-      {% if t.torque_nm is not none %}<span class="chip">{{ t.torque_nm }} Nm</span>{% endif %}
-      {% if t.mode == 'BYPASS' %}<span class="chip chip-bypass">BYPASS</span>{% endif %}
-    </div>
-    <div class="tool-row"><span>Set Count:</span><b>{{ t.set if t.set is not none else '-' }}</b></div>
-    <div class="tool-row"><span>Actual Count:</span><b>{{ t.actual if t.actual is not none else '-' }}</b></div>
-    <div class="bar"><i style="width: {{ [100, (t.actual or 0) * 100 // t.set] | min if t.set else 0 }}%"></i></div>
+<!--
+  Everything below is drawn by station.js from the station data (embedded below for
+  the first paint, then refreshed from /api/station/<id> every 2 s): callout boxes
+  above / below the chassis, a marker on each torque point and the leader lines.
+-->
+<section class="station-view" id="station-view">
+  <div class="status-ribbon ribbon-idle" id="status-ribbon"></div>
+  <div class="callouts callouts-top" id="callouts-top"></div>
+  <div class="chassis-box" id="chassis-box">
+    <img id="chassis-img" alt="Chassis" draggable="false">
+    <div class="markers" id="markers"></div>
   </div>
-  {% else %}
-  <p class="placeholder-note">No tools logged yet for this vehicle at Station {{ station_id }}.</p>
-  {% endfor %}
+  <div class="callouts callouts-bottom" id="callouts-bottom"></div>
+  <svg class="leaders" id="leaders" aria-hidden="true"></svg>
 </section>
+
+<section class="unplaced" id="unplaced-section" hidden>
+  <h3 class="unplaced-title">Not yet placed on the chassis</h3>
+  <div class="tool-grid" id="unplaced"></div>
+</section>
+
+<p class="updated center" id="layout-updated"></p>
 <p class="updated center" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</p>
+
+<script type="application/json" id="station-data">{{ (st or {})|tojson }}</script>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='station.js') }}" data-station-id="{{ station_id }}"></script>
+<script src="{{ url_for('static', filename='station.js') }}" data-station-id="{{ station_id }}"
+        data-csrf="{{ csrf_token }}" data-can-edit="{{ 'true' if user else 'false' }}"></script>
 {% endblock %}

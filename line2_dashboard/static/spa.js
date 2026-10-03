@@ -47,6 +47,11 @@
   }
 
   async function navigate(url, push) {
+    // a page (e.g. the layout editor) can veto leaving while it has unsaved changes
+    if (window.__confirmLeave && !window.__confirmLeave()) {
+      if (!push) history.pushState({ url: location.href }, "", location.href);
+      return;
+    }
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("bad response " + res.status);
@@ -54,6 +59,8 @@
       const doc = new DOMParser().parseFromString(html, "text/html");
 
       clearPageIntervals();
+      window.__confirmLeave = null;
+      window.onbeforeunload = null;
       if (!swapContent(doc)) throw new Error("no .content in response");
       runPageScripts(doc);
 

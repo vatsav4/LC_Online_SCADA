@@ -12,38 +12,21 @@ password = CHANGE_ME
 [ODBC]
 driver = ODBC Driver 18 for SQL Server
 
-[FILTER]
-; Optional: only read log rows with this shop_id_id (leave empty for all).
-shop_id =
-
 [MAIN]
-; sql   = read Station_Mapping + log table (SQL section above)
-; opcua = read live tags from the SCADA's OPC UA server (OPCUA section below)
-source = sql
+; torques = Station_Mapping + Torques_Actual_Data (written by the WinCC script in wincc/)
+; logdump = Station_Mapping + the older smartapp_linedata_line_log_dump table
+source = torques
 poll_interval = 2
 ; 5000 is used by the Line-3 andon dashboard.
 web_port = 5001
 line_title = Line - 2 | Assembly Shop
-; Image in static/ shown on the station page (e.g. chassis.png).
-chassis_image = chassis.svg
+; Chassis picture for stations whose layout doesn't choose one (in static/chassis/ or uploaded).
+chassis_image = chassis-top.svg
+; Signs manager login sessions. Leave empty to generate one automatically in data/.
+secret_key =
 ; true = run on built-in sample rows, no database needed.
 demo_mode = false
 
-[OPCUA]
-; Only used when [MAIN] source = opcua.
-; WinCC V7.x OPC UA server default port is 4862
-endpoint = opc.tcp://SCADA_IP:4862
-; Leave empty for anonymous login.
-username =
-password =
-; Empty = no security. Otherwise e.g. Basic256Sha256,SignAndEncrypt,client_cert.der,client_key.pem
-security =
-; SCADA pushes changes no faster than this (1000 ms is plenty for a display).
-publishing_interval_ms = 1000
-retry_seconds = 10
-tag_map = tag_map.csv
-; Values of a status tag that mean OK, and of a mode tag that mean BYPASS.
-ok_values = 1,true,ok
-bypass_values = 1,true,bypass
-; true = VC/MAT come from SQL Station_Mapping when tag_map.csv has no vc/mat rows.
-mat_from_sql = false
+[FILTER]
+; Only for source = logdump: only read log rows with this shop_id_id (empty = all).
+shop_id =

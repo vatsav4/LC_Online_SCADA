@@ -19,6 +19,16 @@
         <span class="conn-dot"></span><span id="conn-text">{{ 'Online' if db_ok else 'Offline' }}</span>
       </span>
       {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
+      {% if user %}
+      <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <span class="user-name" title="Logged in as line manager">&#128100; {{ user }}</span>
+        <button type="submit" class="link-button">Log out</button>
+      </form>
+      {% else %}
+      <a class="login-link" href="{{ url_for('login', next=request.path) }}">Manager login</a>
+      {% endif %}
     </div>
   </header>
 

@@ -1,41 +1,35 @@
 """
 Line-2 torque dashboard.
 
-Interchangeable data sources, chosen with [MAIN] source in config.ini:
-  source = sql    -> the SQL tables below (default)
-  source = opcua  -> live SCADA tags over OPC UA, see opcua_source.py / tag_map.csv
-Both produce the same station/tool snapshot, so the pages are identical.
+Data (both on the Line-2 SQL Server, reachable only on port 49561):
+  dbo.Station_Mapping      vehicle (VC / MAT) at each station
+  dbo.Torques_Actual_Data  Set / Actual counts and bypass per wrench, written by the
+                           WinCC script wincc/Torques_To_SQL_Action.vbs
+([MAIN] source = logdump switches to the older smartapp log table, see logdump.py.)
 
-SQL source - one SQL Server (only reachable on a non-default port, e.g. 49561):
-  SQL_LINE -> Industry4_157.dbo.Station_Mapping
-                (StationNumber, VC_Number, MAT_Number - vehicle at each station)
-           -> Industry4_157.dbo.smartapp_linedata_line_log_dump
-                (mat_no, type_data = tool tag, data = JSON payload per tool)
+Which wrenches belong to a station, and where each torque point is on the
+chassis picture, comes from the station layouts (layouts.py), edited on the
+station page by logged-in line managers (auth.py, manage_users.py).
 
-A background thread polls both tables on an interval and keeps the latest
-snapshot in memory. Pages and JSON endpoints read from that snapshot only -
-no per-request SQL round trips.
-
-The `data` column looks like:
-  {"Name":"ST08 50Nm T37 Steering pressure line to return lin", "MAT":"MAT513357TFJ12781",
-   "Station No":"STATION 8","Operator":"","Mode":"ACTIVE","Set Count":+2,"Actual Count":+10,"Status":"OK"}
-"+2" is not valid JSON (SQL Server's JSON_VALUE rejects it), so it is parsed here in Python.
-
-Which tools a station has is taken from the log for the vehicle currently at
-that station. STATION_TOOLS below can optionally pin the expected tags per
-station so a tool shows up (red, "awaiting data") before its first tightening.
+A background thread polls SQL every few seconds and keeps the latest snapshot
+in memory; pages and JSON endpoints only read that snapshot.
 """
 
-import os
-import re
-import json
-import time
-import logging
 import configparser
+import copy
+import logging
+import os
 import threading
+import time
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, abort
+from flask import (Flask, abort, jsonify, redirect, render_template, request, send_file, session,
+                   url_for)
+
+import auth
+import layouts
+import logdump
+import torques
 
 # ================= CONFIG =================
 # Real credentials belong in config.ini (gitignored), not in this file.
@@ -64,35 +58,13 @@ ODBC_DRIVER = _get("ODBC", "driver", "ODBC Driver 18 for SQL Server")
 POLL_INTERVAL = float(_get("MAIN", "poll_interval", "2"))
 WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon dashboard
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
-CHASSIS_IMAGE = _get("MAIN", "chassis_image", "chassis.svg")  # file in static/
+DEFAULT_IMAGE = _get("MAIN", "chassis_image", "chassis-top.svg")  # used until a station picks one
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
-SOURCE = _get("MAIN", "source", "sql").strip().lower()  # "sql" or "opcua"
+SOURCE = _get("MAIN", "source", "torques").strip().lower()  # "torques" or "logdump"
+SECRET_KEY = _get("MAIN", "secret_key", "").strip()
 
-
-OPCUA = {
-    "endpoint": _get("OPCUA", "endpoint", "opc.tcp://127.0.0.1:4840"),
-    "username": _get("OPCUA", "username", "").strip() or None,
-    "password": _get("OPCUA", "password", ""),
-    # e.g. "Basic256Sha256,SignAndEncrypt,client_cert.der,client_key.pem"; empty = no security
-    "security": _get("OPCUA", "security", "").strip() or None,
-    "publishing_interval_ms": int(_get("OPCUA", "publishing_interval_ms", "1000")),
-    "retry_seconds": int(_get("OPCUA", "retry_seconds", "10")),
-    "tag_map": os.path.join(os.path.dirname(__file__), _get("OPCUA", "tag_map", "tag_map.csv")),
-    "ok_values": [v.strip() for v in _get("OPCUA", "ok_values", "1,true,ok").split(",")],
-    "bypass_values": [v.strip() for v in _get("OPCUA", "bypass_values", "1,true,bypass").split(",")],
-    # Take VC/MAT from SQL Station_Mapping for stations whose VC/MAT are not in tag_map.csv.
-    "mat_from_sql": _get("OPCUA", "mat_from_sql", "false").strip().lower() in ("1", "true", "yes", "on"),
-}
-
-# Optional: only read log rows for this shop_id_id (if the log table is shared between lines).
+# Only for source = logdump: only read log rows for this shop_id_id.
 SHOP_ID = _get("FILTER", "shop_id", "").strip() or None
-
-# Optional: tool tags each station is expected to have. Stations not listed
-# just show whatever tools were logged for their current vehicle.
-STATION_TOOLS = {
-    # 5: ["T18", "T23"],
-    # 8: ["T19", "T37"],
-}
 
 # ================= LOGGING =================
 
@@ -100,144 +72,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("LINE2_DASHBOARD")
 
 # ================= SHARED STATE =================
-# Written only by poll_loop(), read only by routes/API handlers.
+# raw = stations straight from SQL; stations = raw with the layouts applied.
 
 state_lock = threading.Lock()
 state = {
-    "stations": {},  # {station_no: {station, vc_number, mat_number, status, tools: [...]}}
+    "raw": {},
+    "stations": {},  # {station_no: {station, vc_number, mat_number, status, image, tools: [...]}}
+    "known_tools": [],  # every wrench number seen in the data (for the layout editor)
     "updated_at": None,
     "db_ok": False,
 }
-
-
-# ================= PAYLOAD PARSING =================
-
-_LEADING_PLUS = re.compile(r'(:\s*)\+(?=\d)')
-_PAIR = re.compile(r'"([^"]+)"\s*:\s*(?:"([^"]*)"|([+-]?\d+(?:\.\d+)?))')
-_DIGITS = re.compile(r"(\d+)")
-_NAME_STATION = re.compile(r"^\s*ST\s*0*(\d+)\b", re.IGNORECASE)
-_TORQUE = re.compile(r"(\d+(?:\.\d+)?)\s*Nm\b", re.IGNORECASE)
-
-
-def parse_payload(raw):
-    """Return the `data` JSON as a dict; tolerant of +N numbers and minor breakage. Never raises."""
-    if not raw:
-        return {}
-    text = str(raw).strip()
-    for candidate in (text, _LEADING_PLUS.sub(r"\1", text)):
-        try:
-            value = json.loads(candidate)
-            return value if isinstance(value, dict) else {}
-        except ValueError:
-            pass
-    result = {}
-    for key, str_val, num_val in _PAIR.findall(text):
-        result[key] = str_val if num_val == "" else _to_number(num_val)
-    return result
-
-
-def _to_number(value):
-    if value is None or value == "":
-        return None
-    if isinstance(value, (int, float)):
-        return value
-    try:
-        num = float(str(value).strip())
-    except ValueError:
-        return None
-    return int(num) if num.is_integer() else num
-
-
-def station_of(payload):
-    """Station number from "Station No" ("STATION 8"), else from the Name prefix ("ST08 ...")."""
-    match = _DIGITS.search(str(payload.get("Station No", "")))
-    if match:
-        return int(match.group(1))
-    match = _NAME_STATION.match(str(payload.get("Name", "")))
-    return int(match.group(1)) if match else None
-
-
-def tool_label(name, tag):
-    """"ST08 50Nm T37 Steering pressure line" -> "Steering pressure line" (station, torque and tag removed)."""
-    label = _NAME_STATION.sub("", name or "")
-    label = _TORQUE.sub("", label)
-    if tag:
-        label = re.sub(rf"\b{re.escape(tag)}\b", "", label, flags=re.IGNORECASE)
-    return " ".join(label.split()) or tag
-
-
-def tool_from_row(row):
-    """Log row (dict with type_data, data, in_date_time) -> tool dict for the UI."""
-    payload = parse_payload(row.get("data"))
-    tag = str(row.get("type_data") or "").strip()
-    name = str(payload.get("Name", "")).strip()
-    torque = _TORQUE.search(name)
-    set_count = _to_number(payload.get("Set Count"))
-    actual_count = _to_number(payload.get("Actual Count"))
-    status = str(payload.get("Status", "")).strip().upper()
-    if status not in ("OK", "NOT OK"):
-        # No usable Status from the PLC: same rule as the Line-3 andon (actual < set -> red).
-        status = "NOT OK" if set_count is not None and (actual_count or 0) < set_count else "OK"
-    when = row.get("in_date_time")
-    return {
-        "tag": tag,
-        "label": tool_label(name, tag),
-        "torque_nm": _to_number(torque.group(1)) if torque else None,
-        "station": station_of(payload),
-        "mode": str(payload.get("Mode", "")).strip().upper(),
-        "set": set_count,
-        "actual": actual_count,
-        "status": status,
-        "updated": when.strftime("%d-%m-%Y %H:%M:%S") if hasattr(when, "strftime") else when,
-    }
-
-
-def _tag_key(tag):
-    digits = _DIGITS.search(tag or "")
-    return (int(digits.group(1)) if digits else 10**9, tag)
-
-
-def _pending_tool(tag):
-    return {"tag": tag, "label": "Awaiting data", "torque_nm": None, "station": None, "mode": "",
-            "set": None, "actual": None, "status": "PENDING", "updated": None}
-
-
-def build_stations(rows, station_tools=None):
-    """Group mapping+log rows (newest log first per station) into one entry per station.
-
-    Keeps only log rows recorded AT that station for its current vehicle, and only
-    the newest row per tool tag.
-    """
-    station_tools = station_tools or {}
-    stations = {}
-    for row in rows:
-        number = int(row["StationNumber"])
-        st = stations.setdefault(number, {
-            "station": number,
-            "vc_number": str(row.get("VC_Number") or "").strip(),
-            "mat_number": str(row.get("MAT_Number") or "").strip(),
-            "tools": {},
-        })
-        if row.get("type_data") is None:
-            continue
-        tool = tool_from_row(row)
-        if tool["station"] not in (None, number) or tool["tag"] in st["tools"]:
-            continue
-        st["tools"][tool["tag"]] = tool
-
-    for number, st in stations.items():
-        tools = st["tools"]
-        for tag in station_tools.get(number, []):
-            tools.setdefault(tag, _pending_tool(tag))
-        st["tools"] = sorted(tools.values(), key=lambda t: _tag_key(t["tag"]))
-        st["status"] = station_status(st["tools"])
-    return stations
-
-
-def station_status(tools):
-    if not tools:
-        return "idle"
-    return "green" if all(t["status"] == "OK" for t in tools) else "red"
 
 
 # ================= SQL =================
@@ -257,86 +101,50 @@ def connect(cfg):
     )
 
 
-def fetch_station_rows(conn):
-    """Every station's current vehicle joined to that vehicle's log rows, newest first.
+def load_raw():
+    """Read the configured source. Returns (raw_stations, known_tool_numbers)."""
+    if SOURCE == "logdump":
+        if DEMO_MODE:
+            import demo_data
+            rows = demo_data.station_rows()
+        else:
+            conn = connect(LINE_DB)
+            try:
+                rows = logdump.fetch_station_rows(conn, SHOP_ID)
+            finally:
+                conn.close()
+        raw = logdump.build_stations(rows)
+        known = sorted({t["tag"] for st in raw.values() for t in st["tools"]}, key=logdump._tag_key)
+        return raw, known
 
-    `=` on varchar ignores trailing spaces in SQL Server, so padded mat_no values still match.
-    Stations with no log rows yet come back once with NULL log columns.
-    """
-    shop_filter = " AND l.shop_id_id = ?" if SHOP_ID else ""
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT m.StationNumber, m.VC_Number, m.MAT_Number,
-               l.in_date_time, l.type_data, l.data
-        FROM dbo.Station_Mapping AS m
-        LEFT JOIN dbo.smartapp_linedata_line_log_dump AS l
-               ON l.mat_no = m.MAT_Number{shop_filter}
-        ORDER BY m.StationNumber, l.in_date_time DESC, l.id DESC
-    """, *([SHOP_ID] if SHOP_ID else []))
-    columns = [c[0] for c in cur.description]
-    return [dict(zip(columns, row)) for row in cur.fetchall()]
-
-
-def load_rows():
     if DEMO_MODE:
         import demo_data
-
-        return demo_data.station_rows()
-    conn = connect(LINE_DB)
-    try:
-        return fetch_station_rows(conn)
-    finally:
-        conn.close()
-
-
-def fetch_mapping():
-    """Station -> VC/MAT from Station_Mapping (14 rows; used only by the OPC UA source)."""
-    conn = connect(LINE_DB)
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT StationNumber, VC_Number, MAT_Number FROM dbo.Station_Mapping")
-        return {int(r[0]): {"vc_number": str(r[1] or "").strip(), "mat_number": str(r[2] or "").strip()}
-                for r in cur.fetchall()}
-    finally:
-        conn.close()
+        mapping, torque_rows = demo_data.mapping_rows(), demo_data.torque_rows()
+    else:
+        conn = connect(LINE_DB)
+        try:
+            mapping, torque_rows = torques.fetch(conn)
+        finally:
+            conn.close()
+    return torques.build_stations(mapping, torque_rows, layouts.load()), torques.all_tool_numbers(torque_rows)
 
 
-opcua_source = None  # OpcUaSource instance when SOURCE == "opcua"
-opcua_tag_map = []
-
-
-def start_opcua():
-    global opcua_source, opcua_tag_map
-    from opcua_source import OpcUaSource, load_tag_map
-
-    opcua_tag_map = load_tag_map(OPCUA["tag_map"])
-    opcua_source = OpcUaSource(
-        OPCUA["endpoint"], [r["node_id"] for r in opcua_tag_map],
-        username=OPCUA["username"], password=OPCUA["password"], security=OPCUA["security"],
-        publishing_interval_ms=OPCUA["publishing_interval_ms"], retry_seconds=OPCUA["retry_seconds"],
-    ).start()
-
-
-def load_stations():
-    """Latest stations from whichever source is configured. Returns (stations, source_ok)."""
-    if SOURCE == "opcua":
-        from opcua_source import build_stations_from_tags
-
-        values, updated, connected = opcua_source.snapshot()
-        mapping = fetch_mapping() if OPCUA["mat_from_sql"] else None
-        stations = build_stations_from_tags(opcua_tag_map, values, updated, mapping,
-                                            OPCUA["ok_values"], OPCUA["bypass_values"])
-        return stations, connected
-    return build_stations(load_rows(), STATION_TOOLS), True
+def publish(raw, known=None, db_ok=True):
+    """Apply the current layouts to raw data and make it the live snapshot."""
+    stations = layouts.apply(copy.deepcopy(raw), layouts.load(), DEFAULT_IMAGE)
+    with state_lock:
+        state["raw"] = raw
+        state["stations"] = stations
+        if known is not None:
+            state["known_tools"] = known
+        state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        state["db_ok"] = db_ok
 
 
 def poll_once():
     try:
-        stations, source_ok = load_stations()
-        with state_lock:
-            state["stations"] = stations
-            state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-            state["db_ok"] = source_ok
+        raw, known = load_raw()
+        publish(raw, known)
     except Exception as e:
         logger.error(f"Poll failed: {e}")
         with state_lock:
@@ -352,11 +160,18 @@ def poll_loop():
 # ================= FLASK APP =================
 
 app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=auth.secret_key(SECRET_KEY),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=8 * 1024 * 1024,  # chassis picture uploads
+)
 
 
 @app.context_processor
 def _globals():
-    return {"line_title": LINE_TITLE, "chassis_image": CHASSIS_IMAGE, "demo_mode": DEMO_MODE}
+    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE,
+            "user": auth.current_user(), "csrf_token": auth.csrf_token()}
 
 
 def _snapshot():
@@ -388,6 +203,46 @@ def station(station_id):
                            db_ok=db_ok, updated_at=updated_at)
 
 
+@app.route("/chassis/<name>")
+def chassis_image(name):
+    path = layouts.image_path(name)
+    if not path:
+        abort(404)
+    return send_file(path, max_age=3600)
+
+
+# ---------- login ----------
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    next_url = request.values.get("next") or url_for("index")
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = url_for("index")
+    if request.method == "POST":
+        auth.check_form_csrf()
+        username = request.form.get("username", "").strip()
+        if auth.check_login(username, request.form.get("password", "")):
+            session.clear()
+            session["user"] = username
+            logger.info(f"Login: {username}")
+            return redirect(next_url)
+        error = "Wrong username or password."
+    return render_template("login.html", error=error, next_url=next_url, db_ok=_snapshot()[1])
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    auth.check_form_csrf()
+    session.clear()
+    next_url = request.form.get("next") or ""
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = url_for("index")
+    return redirect(next_url)
+
+
+# ---------- JSON API ----------
+
 @app.route("/api/status")
 def api_status():
     stations, db_ok, updated_at = _snapshot()
@@ -399,11 +254,55 @@ def api_station(station_id):
     stations, db_ok, updated_at = _snapshot()
     if station_id not in stations:
         abort(404)
-    return jsonify({**stations[station_id], "db_ok": db_ok, "updated_at": updated_at})
+    return jsonify({**stations[station_id], "db_ok": db_ok, "updated_at": updated_at,
+                    "can_edit": bool(auth.current_user())})
+
+
+@app.route("/api/editor")
+@auth.manager_required
+def api_editor():
+    """What the layout editor needs: wrench numbers, which station has each, and pictures."""
+    with state_lock:
+        known = list(state["known_tools"])
+        stations = dict(state["stations"])
+    assigned = {t["tag"]: n for n, st in stations.items() for t in st["tools"]}
+    return jsonify({"tools": sorted(set(known) | set(assigned), key=logdump._tag_key),
+                    "assigned": assigned, "images": layouts.list_images()})
+
+
+@app.route("/api/layout/<int:station_id>", methods=["POST"])
+@auth.manager_required
+def api_save_layout(station_id):
+    if not 1 <= station_id <= 999:
+        abort(404)
+    try:
+        saved = layouts.save(station_id, request.get_json(silent=True), auth.current_user())
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    logger.info(f"Layout of station {station_id} saved by {auth.current_user()}")
+    with state_lock:
+        raw = state["raw"]
+    if SOURCE == "torques":
+        poll_once()  # wrench list per station comes from the layout - rebuild now
+    else:
+        publish(raw, db_ok=_snapshot()[1])
+    return jsonify({"ok": True, "layout": saved})
+
+
+@app.route("/api/chassis-images", methods=["POST"])
+@auth.manager_required
+def api_upload_image():
+    file = request.files.get("image")
+    if not file:
+        return jsonify({"error": "No file received."}), 400
+    try:
+        name = layouts.save_upload(file.filename, file.read())
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    logger.info(f"Chassis image {name} uploaded by {auth.current_user()}")
+    return jsonify({"ok": True, "name": name, "images": layouts.list_images()})
 
 
 if __name__ == "__main__":
-    if SOURCE == "opcua":
-        start_opcua()
     threading.Thread(target=poll_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=WEB_PORT, threaded=True)

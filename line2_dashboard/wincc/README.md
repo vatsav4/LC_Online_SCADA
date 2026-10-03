@@ -1,5 +1,33 @@
 # WinCC → SQL → dashboard (no OPC UA licence needed)
 
+## Torque wrench counts → `Torques_Actual_Data`
+
+`Torques_To_SQL_Action.vbs` is a single **global action** (cyclic trigger **2 s**), in the same style as the existing
+`VB_S` Station_Mapping script. For every wrench `SA_T1 … SA_Tn` (structure type `SmartApp_Torque`) it writes:
+
+| Column | From tag |
+|---|---|
+| `T_No` | `'T1'`, `'T2'`, … |
+| `T_Name` | `SA_Tn.XML_TorqueName` (left unchanged if the tag is empty) |
+| `Set_Counts` | `SA_Tn.SetCounts` |
+| `Actual_Counts` | `SA_Tn.ActualCounts` |
+
+The first time a wrench is seen its row is inserted; after that the row is updated. To install:
+1. Global Script → VBS Editor → *Actions* → new action `Torques_To_SQL`.
+2. Paste the file and set the trigger to *Cyclic*, **2 s**.
+3. Set `CONN_STR` (the same login as the existing script) and `TOOL_COUNT`.
+
+How it stays light on WinCC:
+- **One tag read:** all tags are read in a single TagSet.
+- **SQL only on change:** SQL is touched only when a value changes, plus a full refresh every 10 min. All changes go in one batch.
+- **Short timeouts and a pause:** connect and command time out after 3 s. After an SQL error the action leaves SQL alone for 60 s.
+
+Check it in SSMS: `SELECT * FROM dbo.Torques_Actual_Data ORDER BY LEN(T_No), T_No;`
+
+---
+
+The rest of this page describes the more detailed `Line2_Tool_Status` design (status, bypass, MAT and history per tool).
+
 ```
 WinCC V7.5 tags ──(VBScript, every 2 s, only changes)──► SQL: Line2_Tool_Status ──► Flask dashboard
                                                              Line2_Tool_Log (history per MAT)

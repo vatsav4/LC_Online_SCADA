@@ -14,7 +14,6 @@ There are two interchangeable data sources, chosen with `[MAIN] source` in `conf
 | `source =` | Reads from | Use when |
 |---|---|---|
 | `sql` (default) | `Station_Mapping` + the log table on the Line-2 SQL Server | Working from logged data |
-| `wincc` | `Line2_Tool_Status`, written by a WinCC VBScript ([wincc/README.md](wincc/README.md)) | Live SCADA status without an OPC UA licence |
 | `opcua` | Live tags on the SCADA's OPC UA server | Showing the SCADA's live status directly |
 
 ## Data sources (Line-2 SQL Server, port 49561)

@@ -3,8 +3,6 @@ Line-2 torque dashboard.
 
 Interchangeable data sources, chosen with [MAIN] source in config.ini:
   source = sql    -> the SQL tables below (default)
-  source = wincc  -> dbo.Line2_Tool_Status, written by the WinCC VBScript in wincc/
-                     (see wincc_source.py)
   source = opcua  -> live SCADA tags over OPC UA, see opcua_source.py / tag_map.csv
 Both produce the same station/tool snapshot, so the pages are identical.
 
@@ -68,14 +66,8 @@ WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon das
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
 CHASSIS_IMAGE = _get("MAIN", "chassis_image", "chassis.svg")  # file in static/
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
-SOURCE = _get("MAIN", "source", "sql").strip().lower()  # "sql", "wincc" or "opcua"
+SOURCE = _get("MAIN", "source", "sql").strip().lower()  # "sql" or "opcua"
 
-WINCC = {
-    # Dashboard shows Offline if the WinCC script hasn't written a heartbeat for this long.
-    "heartbeat_timeout": int(_get("WINCC", "heartbeat_timeout", "90")),
-    # Take VC/MAT from Station_Mapping for stations where WinCC has no MAT/VC tags.
-    "mat_from_mapping": _get("WINCC", "mat_from_mapping", "true").strip().lower() in ("1", "true", "yes", "on"),
-}
 
 OPCUA = {
     "endpoint": _get("OPCUA", "endpoint", "opc.tcp://127.0.0.1:4840"),
@@ -325,27 +317,8 @@ def start_opcua():
     ).start()
 
 
-_wincc_alive = [None]  # last heartbeat state, so the warning is logged once per change
-
-
 def load_stations():
     """Latest stations from whichever source is configured. Returns (stations, source_ok)."""
-    if SOURCE == "wincc":
-        from wincc_source import build_stations_from_status, fetch
-
-        conn = connect(LINE_DB)
-        try:
-            rows, heartbeat_age, mapping = fetch(conn, WINCC["mat_from_mapping"])
-        finally:
-            conn.close()
-        alive = heartbeat_age is not None and heartbeat_age <= WINCC["heartbeat_timeout"]
-        if alive != _wincc_alive[0]:
-            _wincc_alive[0] = alive
-            if alive:
-                logger.info("WinCC writer heartbeat OK")
-            else:
-                logger.warning(f"WinCC writer heartbeat stale ({heartbeat_age} s) - is the WinCC script running?")
-        return build_stations_from_status(rows, mapping), alive
     if SOURCE == "opcua":
         from opcua_source import build_stations_from_tags
 

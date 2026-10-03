@@ -7,38 +7,40 @@
 {% block center_title %}Station - {{ station_id }}{% endblock %}
 
 {% block content %}
-<div class="page-toolbar">
+<div class="station-top">
   <a href="{{ url_for('index') }}" class="home-button">&larr; Home</a>
+  <div class="plates">
+    <div class="plate">
+      <span class="plate-label">VC NUMBER</span>
+      <span class="plate-value" id="vc-number">{{ st.vc_number or '—' }}</span>
+    </div>
+    <div class="plate plate-wide">
+      <span class="plate-label">MAT NUMBER</span>
+      <span class="plate-value" id="mat-number">{{ st.mat_number or '—' }}</span>
+    </div>
+  </div>
   <div class="station-nav">
+    {% if user %}
+    <button type="button" class="nav-button edit-button" id="edit-toggle">&#9998; Edit positions</button>
+    {% endif %}
     {% if station_id > 1 %}
-    <a href="{{ url_for('station', station_id=station_id - 1) }}" class="nav-button">&lsaquo; Station {{ station_id - 1 }}</a>
+    <a href="{{ url_for('station', station_id=station_id - 1) }}" class="nav-button">&lsaquo; St {{ station_id - 1 }}</a>
     {% endif %}
     {% if station_id < total_stations %}
-    <a href="{{ url_for('station', station_id=station_id + 1) }}" class="nav-button">Station {{ station_id + 1 }} &rsaquo;</a>
+    <a href="{{ url_for('station', station_id=station_id + 1) }}" class="nav-button">St {{ station_id + 1 }} &rsaquo;</a>
     {% endif %}
   </div>
 </div>
 
-<section class="plates">
-  <div class="plate">
-    <div class="plate-label">VC NUMBER</div>
-    <div class="plate-value" id="vc-number">{{ st.vc_number or '—' }}</div>
-  </div>
-  <div class="plate plate-wide">
-    <div class="plate-label">MAT NUMBER</div>
-    <div class="plate-value" id="mat-number">{{ st.mat_number or '—' }}</div>
-  </div>
+{% if user %}
+<!-- Managers only: drag the circles, then Save writes x / y into templates/station_{{ station_id }}.html -->
+<section class="edit-bar" id="edit-bar" hidden>
+  <span><b>Editing positions.</b> Drag the circles onto the torque points, then press Save.</span>
+  <span class="edit-msg" id="edit-msg"></span>
+  <button type="button" class="nav-button" id="edit-cancel">Cancel</button>
+  <button type="button" class="home-button" id="edit-save">Save positions</button>
 </section>
-
-<!-- Only with ?setup=1 in the address: drag circles, copy the generated lines into the template. -->
-<section class="setup-panel" id="setup-panel" hidden>
-  <div>
-    <b>Setup view.</b> Drag the circles onto the torque points, then copy these lines into
-    <code>templates/{{ 'station_%d.html' % station_id }}</code> (replace the existing <code>tools</code> list) and save the file.
-  </div>
-  <textarea id="setup-code" readonly rows="6" spellcheck="false"></textarea>
-  <button type="button" class="home-button" id="setup-copy">Copy</button>
-</section>
+{% endif %}
 
 <!--
   Drawn by station.js from the station data (embedded below for the first paint, then
@@ -58,7 +60,7 @@
 </section>
 
 <section class="unplaced" id="unplaced-section" hidden>
-  <h3 class="unplaced-title">No position given in the template (x / y missing)</h3>
+  <h3 class="unplaced-title">No position yet{% if user %} - click Edit positions to place them{% endif %}</h3>
   <div class="tool-grid" id="unplaced"></div>
 </section>
 
@@ -68,5 +70,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='station.js') }}" data-station-id="{{ station_id }}"></script>
+<script src="{{ url_for('static', filename='station.js') }}" data-station-id="{{ station_id }}"
+        data-csrf="{{ csrf_token }}"></script>
 {% endblock %}

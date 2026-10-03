@@ -21,3 +21,11 @@ line_title = Line - 2 | Assembly Shop
 total_stations = 17
 ; true = run on built-in sample data, no database needed.
 demo_mode = false
+; Signs the manager login cookie. Any long random text; empty = new one at every start
+; (managers then just log in again after a restart).
+secret_key =
+
+[MANAGERS]
+; Line managers who may move the circles on the station pages.
+; Create a line with:  python app.py hash-password   and paste it here, e.g.
+; manager1 = scrypt:32768:8:1$....

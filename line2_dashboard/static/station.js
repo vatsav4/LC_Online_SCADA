@@ -1,12 +1,13 @@
 // Station page: chassis picture with a circle on every torque point, callout boxes
 // above / below joined by leader lines, refreshed every 2 s.
-// With ?setup=1 in the address the circles can be dragged, and the matching
-// `tools` lines for templates/station_<n>.html are shown ready to copy.
+// Logged-in managers can click "Edit positions", drag the circles and Save; the
+// server writes the new x / y into templates/station_<n>.html.
 (function () {
   const script = document.currentScript;
   const stationId = script.getAttribute("data-station-id");
+  const csrf = script.getAttribute("data-csrf");
   const $ = (id) => document.getElementById(id);
-  const setup = new URLSearchParams(location.search).has("setup");
+  let setup = false;   // true while a manager is editing positions
 
   let st = JSON.parse($("station-data").textContent || "{}");
   let positions = {};  // setup mode: tag -> {x, y} as dragged (percent)
@@ -64,7 +65,7 @@
     const waiting = all.filter(t => t.status === "PENDING").length;
     const parts = [bad && `${bad} NOT OK`, waiting && `${waiting} AWAITING DATA`].filter(Boolean);
     const rib = $("status-ribbon");
-    if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "SETUP VIEW"; }
+    if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "EDITING POSITIONS"; }
     else if (!all.length) { rib.className = "status-ribbon ribbon-idle"; rib.textContent = "NO WRENCHES IN THIS STATION'S TEMPLATE"; }
     else if (!parts.length) { rib.className = "status-ribbon ribbon-green"; rib.textContent = "ALL TORQUES OK"; }
     else { rib.className = "status-ribbon " + (bad ? "ribbon-red" : "ribbon-idle"); rib.textContent = parts.join(" · "); }
@@ -77,7 +78,6 @@
     $("unplaced").innerHTML = unplaced.map(card).join("");
     $("unplaced-section").hidden = !unplaced.length;
     drawLeaders();
-    if (setup) showSetupCode();
   }
 
   // Elbow lines from each circle to its box, computed from the real on-screen positions.
@@ -123,28 +123,43 @@
     const el = e.target.closest("[data-tag]"); if (el) highlight(el.getAttribute("data-tag"), false);
   });
 
-  // ---------------------------------------------------------------- setup view
-  function showSetupCode() {
-    const lines = (st.tools || []).map(t => {
-      const p = positions[t.tag];
-      const name = t.label === t.tag ? "" : t.label;
-      return `    {"t_no": "${t.tag}", "name": ${JSON.stringify(name)}, "x": ${p.x}, "y": ${p.y}},`;
-    });
-    $("setup-code").value = "{% set tools = [\n" + lines.join("\n") + "\n] %}";
+  // ---------------------------------------------------------------- edit positions
+  const editToggle = $("edit-toggle");
+  const msg = text => { if ($("edit-msg")) $("edit-msg").textContent = text || ""; };
+  let dirty = false;
+
+  function setEditing(on) {
+    setup = on;
+    dirty = false;
+    positions = {};
+    $("edit-bar").hidden = !on;
+    editToggle.hidden = on;
+    msg("");
+    render();
   }
 
-  if (setup) {
-    $("setup-panel").hidden = false;
-    $("setup-copy").addEventListener("click", () => {
-      $("setup-code").select();
-      (navigator.clipboard ? navigator.clipboard.writeText($("setup-code").value) : Promise.reject())
-        .catch(() => document.execCommand("copy"));
-      $("setup-copy").textContent = "Copied";
-      setTimeout(() => { $("setup-copy").textContent = "Copy"; }, 1500);
+  if (editToggle) {
+    editToggle.addEventListener("click", () => setEditing(true));
+    $("edit-cancel").addEventListener("click", () => {
+      if (!dirty || confirm("Discard the moved positions?")) setEditing(false);
+    });
+    $("edit-save").addEventListener("click", async () => {
+      msg("Saving…");
+      try {
+        const res = await fetch(`/api/station/${stationId}/positions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+          body: JSON.stringify({ positions }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "HTTP " + res.status);
+        setEditing(false);
+        await refresh();
+      } catch (err) { msg("Not saved: " + err.message); }
     });
     $("markers").addEventListener("pointerdown", e => {
       const m = e.target.closest(".marker");
-      if (!m) return;
+      if (!m || !setup) return;
       e.preventDefault();
       m.setPointerCapture(e.pointerId);
       drag = { el: m, tag: m.getAttribute("data-tag") };
@@ -158,8 +173,9 @@
       positions[drag.tag] = { x, y };
       drag.el.style.left = x + "%";
       drag.el.style.top = y + "%";
+      dirty = true;
+      msg("Unsaved changes");
       drawLeaders();
-      showSetupCode();
     });
     const endDrag = () => { if (drag) { drag = null; render(); } };
     $("markers").addEventListener("pointerup", endDrag);

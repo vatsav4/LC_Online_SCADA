@@ -82,7 +82,70 @@ def test_pages_and_api(client):
     st1 = client.get("/api/station/1").get_json()
     assert [t["tag"] for t in st1["tools"]] == ["T1", "T2", "T3"] and st1["tools"][0]["x"] == 16
     page = client.get("/station/5").get_data(as_text=True)
-    assert "MAT513357TFJ12784" in page and "chassis/chassis-top.svg" in page and "setup-panel" in page
+    assert "MAT513357TFJ12784" in page and "chassis/chassis-top.svg" in page and "Manager login" in page and "edit-toggle" not in page
     assert client.get("/station/3").status_code == 200
     assert client.get("/station/18").status_code == 404
     assert client.get("/").status_code == 200
+
+
+# ---------------- manager login + saving positions into the template ----------------
+
+@pytest.fixture
+def station_copy(tmp_path, monkeypatch):
+    """Point the app at a copy of the templates so tests never modify the real files."""
+    import shutil
+    shutil.copytree(os.path.join(os.path.dirname(line2.__file__), "templates"), tmp_path / "templates")
+    shutil.copytree(os.path.join(os.path.dirname(line2.__file__), "static"), tmp_path / "static")
+    monkeypatch.setattr(line2.app, "root_path", str(tmp_path))
+    monkeypatch.setattr(line2.app, "template_folder", str(tmp_path / "templates"))
+    line2.app.jinja_env.loader.searchpath = [str(tmp_path / "templates")]
+    line2._template_cache.clear()
+    from werkzeug.security import generate_password_hash
+    monkeypatch.setattr(line2, "MANAGERS", {"manager1": generate_password_hash("secret-pass")})
+    yield tmp_path / "templates"
+    line2.app.jinja_env.loader.searchpath = [os.path.join(os.path.dirname(line2.__file__), "templates")]
+    line2._template_cache.clear()
+
+
+def _csrf(client):
+    with client.session_transaction() as s:
+        s.setdefault("csrf", "test-token")
+        return s["csrf"]
+
+
+def test_save_positions_needs_login_and_rewrites_template(client, station_copy):
+    body = {"positions": {"T18": {"x": 44.62, "y": 75.9}}}
+    assert client.post("/api/station/5/positions", json=body).status_code == 401
+
+    bad = client.post("/login", data={"username": "manager1", "password": "nope", "csrf_token": _csrf(client)})
+    assert b"Wrong username or password" in bad.data
+    ok = client.post("/login", data={"username": "Manager1", "password": "secret-pass",
+                                     "csrf_token": _csrf(client), "next": "/station/5"})
+    assert ok.headers["Location"] == "/station/5"
+    assert "edit-toggle" in client.get("/station/5").get_data(as_text=True)
+    assert client.post("/api/station/5/positions", json=body).status_code == 403  # no CSRF header
+
+    res = client.post("/api/station/5/positions", json=body, headers={"X-CSRF-Token": _csrf(client)})
+    assert res.status_code == 200, res.get_json()
+    text = (station_copy / "station_5.html").read_text()
+    assert '{"t_no": "T18", "name": "ARB bolt fitment", "x": 44.6, "y": 75.9},' in text
+    assert '{"t_no": "T23", "name": "Front/rear ARB", "x": 78, "y": 67},' in text   # untouched
+    assert "positions last saved" in text and "by Manager1" in text
+    assert "Station 5 - which torque wrenches" in text                             # comments kept
+    assert (station_copy / "station_5.html.bak").exists()
+    st5 = client.get("/api/station/5").get_json()
+    assert [(t["tag"], t["x"], t["y"]) for t in st5["tools"]] == [("T18", 44.6, 75.9), ("T23", 78, 67)]
+
+    # saving twice keeps a single "last saved" line
+    client.post("/api/station/5/positions", json=body, headers={"X-CSRF-Token": _csrf(client)})
+    assert (station_copy / "station_5.html").read_text().count("positions last saved") == 1
+
+    bad_body = client.post("/api/station/5/positions", json={"positions": {"T18": {"x": "abc"}}},
+                           headers={"X-CSRF-Token": _csrf(client)})
+    assert bad_body.status_code == 400
+
+
+def test_login_redirect_stays_on_site(client, station_copy):
+    res = client.post("/login", data={"username": "manager1", "password": "secret-pass",
+                                      "csrf_token": _csrf(client), "next": "//evil.example"})
+    assert res.headers["Location"] == "/"

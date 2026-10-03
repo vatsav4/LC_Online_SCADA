@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 line2_dashboard/config.ini
+line2_dashboard/templates/*.bak
+line2_dashboard/templates/*.tmp

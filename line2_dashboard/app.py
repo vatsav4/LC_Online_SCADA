@@ -10,28 +10,40 @@ Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
     {% set tools = [ {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33}, ... ] %}
 The app reads that list from the template itself, so the station page and its
-tile on the overview always agree. Open /station/<n>?setup=1 to drag the
-circles and copy the x / y numbers into the template.
+tile on the overview always agree.
+
+Line managers (accounts in config.ini [MANAGERS]) can log in, click "Edit
+positions" on a station page, drag the circles and Save: the new x / y are
+written straight back into that station's template file (old copy kept as
+station_<n>.html.bak). Make a password hash with:  python app.py hash-password
 
 A background thread reads both tables every few seconds and keeps the latest
 values in memory; pages and JSON endpoints only read that snapshot.
 """
 
 import configparser
+import getpass
+import hmac
+import json
 import logging
 import os
+import re
+import secrets
+import shutil
+import sys
 import threading
 import time
 from datetime import datetime
 
-from flask import Flask, abort, jsonify, render_template
+from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 from jinja2 import nodes
+from werkzeug.security import check_password_hash, generate_password_hash
 
 # ================= CONFIG =================
 # Real credentials belong in config.ini (gitignored), not in this file.
 # See config.ini.example for the format.
 
-_cfg = configparser.ConfigParser()
+_cfg = configparser.ConfigParser(interpolation=None)  # passwords / hashes may contain % or $
 _cfg.read(os.path.join(os.path.dirname(__file__), "config.ini"))
 
 
@@ -56,6 +68,10 @@ WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon das
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
 TOTAL_STATIONS = int(_get("MAIN", "total_stations", "17"))
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
+# Signs the login cookie. Empty = random at every start (managers just log in again after a restart).
+SECRET_KEY = _get("MAIN", "secret_key", "").strip() or secrets.token_hex(32)
+# username = password hash (from: python app.py hash-password)
+MANAGERS = dict(_cfg["MANAGERS"]) if _cfg.has_section("MANAGERS") else {}
 
 # ================= LOGGING =================
 
@@ -158,7 +174,12 @@ def poll_loop():
 # ================= FLASK APP =================
 
 app = Flask(__name__)
-app.config["TEMPLATES_AUTO_RELOAD"] = True  # edited station templates show up on refresh
+app.config.update(
+    TEMPLATES_AUTO_RELOAD=True,  # edited station templates show up on refresh
+    SECRET_KEY=SECRET_KEY,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 
 # ---------- station templates ----------
@@ -257,9 +278,122 @@ def _summary(stations):
             for st in stations]
 
 
+# ---------- manager login ----------
+
+def current_user():
+    return session.get("user")
+
+
+def csrf_token():
+    if "csrf" not in session:
+        session["csrf"] = secrets.token_hex(16)
+    return session["csrf"]
+
+
+def csrf_ok():
+    sent = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token") or ""
+    expected = session.get("csrf") or ""
+    return bool(sent) and bool(expected) and hmac.compare_digest(sent, expected)
+
+
+def _safe_next(url):
+    return url if url and url.startswith("/") and not url.startswith("//") else url_for("index")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    next_url = _safe_next(request.values.get("next"))
+    if request.method == "POST":
+        if not csrf_ok():
+            abort(400)
+        username = request.form.get("username", "").strip()
+        password_hash = MANAGERS.get(username.lower())
+        if password_hash and check_password_hash(password_hash, request.form.get("password", "")):
+            session.clear()
+            session["user"] = username
+            logger.info(f"Manager login: {username}")
+            return redirect(next_url)
+        time.sleep(1)  # slow down password guessing
+        error = "Wrong username or password."
+    return render_template("login.html", error=error, next_url=next_url, db_ok=state["db_ok"])
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    if not csrf_ok():
+        abort(400)
+    session.clear()
+    return redirect(_safe_next(request.form.get("next")))
+
+
+# ---------- saving circle positions into the station template ----------
+
+_TOOLS_BLOCK = re.compile(r"\{%-?\s*set\s+tools\s*=\s*\[.*?\]\s*-?%\}", re.DOTALL)
+
+
+def save_positions(station_id, positions, username):
+    """Write new x / y (percent) for the station's wrenches into templates/station_<n>.html.
+
+    Only positions change; the wrench list, names and everything else in the file stay as they are.
+    """
+    name = station_template(station_id)
+    if name == "station_generic.html":
+        raise ValueError(f"Station {station_id} has no template of its own yet - create station_{station_id}.html first.")
+    path = os.path.join(app.root_path, "templates", name)
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    if len(_TOOLS_BLOCK.findall(source)) != 1:
+        raise ValueError(f"{name}: expected exactly one '{{% set tools = [...] %}}' block.")
+
+    lines = []
+    for t in station_config(station_id)["tools"]:
+        x, y = t["x"], t["y"]
+        p = positions.get(t["t_no"])
+        if p is not None:
+            x, y = (round(min(100.0, max(0.0, float(p[k]))), 1) for k in ("x", "y"))
+            x, y = (int(v) if float(v).is_integer() else v for v in (x, y))
+        entry = {"t_no": t["t_no"], "name": t["name"]}
+        if x is not None:
+            entry.update(x=x, y=y)
+        lines.append("    " + json.dumps(entry, ensure_ascii=False) + ",")
+    block = "{% set tools = [\n" + "\n".join(lines) + "\n] %}"
+
+    shutil.copyfile(path, path + ".bak")
+    new_source = _TOOLS_BLOCK.sub(lambda m: block, source)
+    stamp = f"{{# positions last saved {datetime.now():%d-%m-%Y %H:%M} by {username} #}}"
+    new_source = re.sub(r"\{# positions last saved .*? #\}\n?", "", new_source)
+    new_source = new_source.replace(block, stamp + "\n" + block)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(new_source)
+    os.replace(tmp, path)
+    _template_cache.pop(path, None)
+
+
+@app.route("/api/station/<int:station_id>/positions", methods=["POST"])
+def api_save_positions(station_id):
+    if not current_user():
+        return jsonify({"error": "Please log in as a line manager."}), 401
+    if not csrf_ok():
+        return jsonify({"error": "Session expired - reload the page and try again."}), 403
+    if not 1 <= station_id <= TOTAL_STATIONS:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    try:
+        positions = {str(k).upper(): {"x": float(v["x"]), "y": float(v["y"])}
+                     for k, v in (body.get("positions") or {}).items()}
+        save_positions(station_id, positions, current_user())
+    except (ValueError, TypeError, KeyError) as e:
+        return jsonify({"error": str(e) or "Invalid positions."}), 400
+    logger.info(f"Station {station_id} positions saved by {current_user()}")
+    return jsonify({"ok": True})
+
+
 @app.context_processor
 def _globals():
-    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE}
+    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE,
+            "user": current_user(), "csrf_token": csrf_token()}
 
 
 @app.route("/")
@@ -292,6 +426,20 @@ def api_station(station_id):
     return jsonify({**build_station(station_id, mapping, torques), "db_ok": db_ok, "updated_at": updated_at})
 
 
+def hash_password():
+    """python app.py hash-password  ->  prints a line to paste under [MANAGERS] in config.ini"""
+    username = input("Manager username: ").strip().lower()
+    password = getpass.getpass("Password: ")
+    if len(password) < 8 or password != getpass.getpass("Repeat password: "):
+        print("Passwords must match and have at least 8 characters.")
+        return
+    print("\nAdd this line under [MANAGERS] in config.ini, then restart the app:\n")
+    print(f"{username} = {generate_password_hash(password)}")
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["hash-password"]:
+        hash_password()
+        sys.exit(0)
     threading.Thread(target=poll_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=WEB_PORT, threaded=True)

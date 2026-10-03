@@ -1,6 +1,7 @@
 # Line 2 Torque Dashboard
 
 A Flask dashboard for Line 2, built like `andon_dashboard` in the Online-SCADA repo: one `app.py` and one template per station.
+It's laid out for desktop screens: a whole station fits on one screen without scrolling, from 1366×768 up to 1920×1080.
 
 | All stations | Station detail |
 |---|---|
@@ -24,6 +25,7 @@ table yet. Bypassed wrenches get a BYPASS chip and an amber rim on the circle.
 app.py                       everything Python: reads the two tables, pages, JSON for live refresh
 config.ini.example           copy to config.ini, fill in SQL user/password
 templates/station_<n>.html   one per station - THE place to list its wrenches (see below)
+templates/login.html         manager login page
 templates/station_base.html  shared look of all station pages
 templates/base.html, index.html
 static/station.js            draws circles, boxes and lines; refreshes every 2 s
@@ -45,13 +47,23 @@ Open `templates/station_<n>.html` and list the wrenches:
 
 - **`t_no`:** the wrench number as in `Torques_Actual_Data` (`T18` = WinCC `SA_T18`).
 - **`name`:** the text on the box. With `""`, the box shows `T_Name` from SQL.
-- **`x`, `y`:** where the circle sits on the picture, in **% from the left / top edge**. You don't have to guess these:
-  open **`http://<pc>:5001/station/<n>?setup=1`**, drag the circles onto the torque points, press **Copy**, and paste
-  the lines over the `tools` list in the template.
+- **`x`, `y`:** where the circle sits on the picture, in **% from the left / top edge**. You don't have to type these;
+  line managers set them on the page (see below).
 - **`chassis_image`:** a file in `static/chassis/`. Each station can use its own picture.
 
 Save the file and refresh the browser; no restart is needed. The station's tile on the overview uses the same list.
 Circles in the top half of the picture get their box above the chassis, the others below.
+
+## Line managers: moving the circles
+
+1. On the dashboard PC, create the account. Run `python app.py hash-password`, enter a name and password, and paste the printed
+   line under `[MANAGERS]` in `config.ini`. Then restart the app.
+2. The manager clicks **Manager login** (top right) and opens a station.
+3. They click **Edit positions**, drag the circles onto the torque points, and press **Save positions**.
+
+Save writes the new `x` / `y` straight into `templates/station_<n>.html` and adds a "positions last saved … by …" line.
+Wrench numbers, names and comments stay as they are. The previous version is kept as `station_<n>.html.bak`.
+Viewing the dashboard needs no login.
 
 ## Run
 

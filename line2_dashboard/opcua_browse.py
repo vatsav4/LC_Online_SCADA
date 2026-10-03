@@ -4,9 +4,9 @@ List the tags a SCADA exposes over OPC UA, to help fill in tag_map.csv.
 Read-only and run once by hand (not by the dashboard). Walks the address space
 from a start node and prints one CSV line per variable:  node_id,path,value
 
-    python opcua_browse.py opc.tcp://<scada-ip>:4840
-    python opcua_browse.py opc.tcp://<scada-ip>:4840 --start "ns=2;s=Line2" --depth 4 > tags.csv
-    python opcua_browse.py opc.tcp://<scada-ip>:4840 --user admin --password secret
+    python opcua_browse.py opc.tcp://<scada-ip>:4862
+    python opcua_browse.py opc.tcp://<scada-ip>:4862 --start "ns=2;s=Line2" --depth 4 > tags.csv
+    python opcua_browse.py opc.tcp://<scada-ip>:4862 --user admin --password secret
 
 Keep --start as narrow as possible on a big SCADA; --max-nodes stops the walk early.
 """

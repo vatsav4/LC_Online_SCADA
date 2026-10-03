@@ -31,7 +31,8 @@ demo_mode = false
 
 [OPCUA]
 ; Only used when [MAIN] source = opcua.
-endpoint = opc.tcp://SCADA_IP:4840
+; WinCC V7.x OPC UA server default port is 4862
+endpoint = opc.tcp://SCADA_IP:4862
 ; Leave empty for anonymous login.
 username =
 password =

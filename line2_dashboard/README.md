@@ -77,7 +77,7 @@ CREATE INDEX IX_line_log_dump_mat_time ON dbo.smartapp_linedata_line_log_dump (m
 ## Reading live SCADA tags (`source = opcua`)
 
 The dashboard talks to the SCADA's **OPC UA server**. WinCC, Ignition, AVEVA/Wonderware, iFIX and Kepware all
-provide one, usually on `opc.tcp://<scada-ip>:4840`. The PLCs on the line are never contacted directly,
+provide one. WinCC V7.x uses `opc.tcp://<scada-ip>:4862`, other products often 4840. The PLCs on the line are never contacted directly,
 so it doesn't matter that there are several of them.
 
 **Why it doesn't slow the SCADA down:**
@@ -91,7 +91,7 @@ so it doesn't matter that there are several of them.
 1. On the SCADA, enable its OPC UA server and create a read-only user. How depends on the product; for WinCC it's in the OPC UA settings of the runtime.
 2. List the tag node ids:
    ```
-   python opcua_browse.py opc.tcp://<scada-ip>:4840 --start "<folder node id>" > tags.csv
+   python opcua_browse.py opc.tcp://<scada-ip>:4862 --start "<folder node id>" > tags.csv
    ```
 3. Copy `tag_map.csv.example` to `tag_map.csv`. Add one row per tag, using `kind` = `vc`, `mat`, `set`, `actual`, `status` or `mode`:
    ```

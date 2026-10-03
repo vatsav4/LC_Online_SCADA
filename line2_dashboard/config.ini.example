@@ -13,20 +13,11 @@ password = CHANGE_ME
 driver = ODBC Driver 18 for SQL Server
 
 [MAIN]
-; torques = Station_Mapping + Torques_Actual_Data (written by the WinCC script in wincc/)
-; logdump = Station_Mapping + the older smartapp_linedata_line_log_dump table
-source = torques
 poll_interval = 2
 ; 5000 is used by the Line-3 andon dashboard.
 web_port = 5001
 line_title = Line - 2 | Assembly Shop
-; Chassis picture for stations whose layout doesn't choose one (in static/chassis/ or uploaded).
-chassis_image = chassis-top.svg
-; Signs manager login sessions. Leave empty to generate one automatically in data/.
-secret_key =
-; true = run on built-in sample rows, no database needed.
+; Station tiles / pages 1..total_stations (templates/station_<n>.html).
+total_stations = 17
+; true = run on built-in sample data, no database needed.
 demo_mode = false
-
-[FILTER]
-; Only for source = logdump: only read log rows with this shop_id_id (empty = all).
-shop_id =

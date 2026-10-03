@@ -1,0 +1,7 @@
+{#
+  Used for any station that has no templates/station_<n>.html of its own.
+  To set a station up, copy station_1.html to station_<n>.html and edit its tools list.
+#}
+{% extends "station_base.html" %}
+{% set chassis_image = "chassis-top.svg" %}
+{% set tools = [] %}

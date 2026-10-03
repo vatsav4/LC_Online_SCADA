@@ -255,7 +255,7 @@ body {
   100% { transform: scale(1.6); opacity: 0; }
 }
 .marker.hl, .marker:hover { transform: scale(1.2); z-index: 4; }
-.marker-edit { cursor: grab; outline: 3px dashed var(--blue); outline-offset: 3px; }
+.marker-edit { cursor: grab; outline: 3px dashed var(--blue); outline-offset: 3px; touch-action: none; }
 .marker.dragging { cursor: grabbing; transform: scale(1.3); }
 
 /* callout boxes (same look as the mock-up) */
@@ -298,51 +298,21 @@ body {
 .unplaced { max-width: 1400px; margin: 0 auto 1rem; }
 .unplaced-title { text-align: center; color: #556; font-size: 1rem; margin: 0 0 0.75rem; }
 
-/* layout editor */
-.editor-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.5rem;
+/* setup view (?setup=1) */
+.setup-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
   max-width: 1400px;
   margin: 0 auto 1rem;
   padding: 0.75rem 1rem;
   background: #e6f2f9;
   border: 2px solid var(--blue);
   border-radius: 10px;
+  font-size: 0.9rem;
 }
-.editor-bar[hidden] { display: none; }
-.editor-group { display: flex; align-items: center; gap: 0.5rem; }
-.editor-group label { font-weight: 600; font-size: 0.9rem; }
-.editor-group select { padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border); max-width: 260px; }
-.editor-hint { flex: 1 1 260px; margin: 0; font-size: 0.85rem; color: #445; }
-.editor-actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
-.editor-msg { font-size: 0.85rem; color: var(--red-dark); font-weight: 600; }
-.upload-button { cursor: pointer; }
-button.nav-button, button.home-button { font: inherit; cursor: pointer; }
-.edit-button { border-color: var(--blue); color: var(--blue); }
-.label-input { width: 100%; font: inherit; font-size: 0.95rem; padding: 0.15rem 0.3rem; border-radius: 4px; border: 1px solid rgba(0, 0, 0, 0.3); margin-top: 0.2rem; }
-.card-edit { display: flex; gap: 0.4rem; justify-content: center; margin-top: 0.6rem; }
-.card-edit button {
-  font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer;
-  padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.35); background: rgba(255, 255, 255, 0.85);
-}
-
-/* login */
-.login-link, .link-button { color: var(--gold); font-size: 0.85rem; text-decoration: underline; }
-.link-button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 0.85rem; }
-.logout-form { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; }
-.user-name { font-size: 0.85rem; }
-.login-card {
-  max-width: 380px; margin: 2rem auto; padding: 1.5rem 1.75rem;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08); display: grid; gap: 0.9rem;
-}
-.login-card h2 { margin: 0; font-size: 1.2rem; }
-.login-card label { display: grid; gap: 0.3rem; font-weight: 600; font-size: 0.9rem; }
-.login-card input { padding: 0.55rem; border-radius: 6px; border: 1px solid var(--border); font: inherit; }
-.login-note { margin: 0; color: #556; font-size: 0.85rem; }
-.login-error { margin: 0; color: var(--red-dark); font-weight: 600; }
+.setup-panel textarea { width: 100%; font: 0.85rem Consolas, "Courier New", monospace; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); }
+.setup-panel .home-button { justify-self: start; border: 0; font: inherit; cursor: pointer; }
 
 .placeholder-note { text-align: center; color: #666; font-style: italic; grid-column: 1 / -1; }
 

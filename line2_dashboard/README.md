@@ -1,85 +1,65 @@
 # Line 2 Torque Dashboard
 
-A Flask dashboard for Line 2. It follows the same pattern as `andon_dashboard` in the Online-SCADA repo:
-- a single `app.py` with a background poll thread
-- settings in `config.ini`
-- the navy/gold look, with green/red tiles and SPA-style navigation
+A Flask dashboard for Line 2, built like `andon_dashboard` in the Online-SCADA repo: one `app.py` and one template per station.
 
 | All stations | Station detail |
 |---|---|
 | ![Overview](docs/overview.png) | ![Station](docs/station1.png) |
 
-## How the data flows
+## Data: two tables
+
+On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with `SERVER=172.25.208.39,49561`; note the comma):
+
+| Table | Filled by | Shown as |
+|---|---|---|
+| `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | existing WinCC script `VB_S` | VC and MAT plates |
+| `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
+
+A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
+table yet. Bypassed wrenches get a BYPASS chip and an amber rim on the circle.
+
+## Files
 
 ```
-WinCC tags SA_T1..SA_Tn ──(wincc/Torques_To_SQL_Action.vbs)──► dbo.Torques_Actual_Data ─┐
-WinCC tags STATIONn.VC/.MAT ──(existing VB_S script)────────► dbo.Station_Mapping ──────┼──► Flask dashboard
-Station layouts (which wrenches + where on the chassis) ─────► data/layouts.json ───────┘
+app.py                       everything Python: reads the two tables, pages, JSON for live refresh
+config.ini.example           copy to config.ini, fill in SQL user/password
+templates/station_<n>.html   one per station - THE place to list its wrenches (see below)
+templates/station_base.html  shared look of all station pages
+templates/base.html, index.html
+static/station.js            draws circles, boxes and lines; refreshes every 2 s
+static/chassis/              chassis pictures (put your own here)
+wincc/                       the WinCC VBScript that fills Torques_Actual_Data
 ```
 
-| Source | Used for |
-|---|---|
-| `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | VC and MAT plates of each station |
-| `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | One box per wrench. Green when Actual ≥ Set, red when Actual < Set, a BYPASS chip when bypassed |
-| `data/layouts.json` | Which wrenches belong to each station, where each torque point sits on the chassis picture, and which picture the station uses |
+## Adding wrenches to a station
 
-The SQL Server is `172.25.208.39` and only listens on port **49561**. The app connects with
-`SERVER=172.25.208.39,49561`; note the comma.
+Open `templates/station_<n>.html` and list the wrenches:
 
-The older smartapp log table can still be used with `source = logdump` in `config.ini` (see `logdump.py`).
-
-## Station page
-
-- **Chassis picture:** each torque point has a **marker**:
-  - green = done, red pulsing = not done, grey = no data yet
-  - an amber rim means bypass
-  - the ring around the marker fills as Actual approaches Set
-- **Callout boxes:** shown above and below the chassis and joined to their marker by a leader line. Points in the top half of the
-  picture get a box above, the others a box below, ordered left to right so the lines don't cross.
-- **Hover:** hovering a marker or a box highlights both and the line between them.
-- **Ribbon:** the ribbon at the top summarises the station, e.g. "2 NOT OK · 1 AWAITING DATA".
-
-## Line managers: editing station layouts
-
-Anyone can view the dashboard. To change layouts, a manager logs in with **Manager login** at the top right.
-On a station page, they then click **Edit layout**, which lets them:
-
-- **Drag markers** onto the right bolt. Positions are stored as fractions of the picture, so they stay correct on any screen size.
-- **Add a wrench** to the station from the list of wrenches the WinCC script has logged. The list shows if the wrench is already on another station.
-- **Rename** the text on a box, take a point off the chassis, or remove the wrench from the station.
-- **Choose or upload** the chassis picture for this station. Each station can have its own view; PNG, JPG and WEBP up to 8 MB are accepted.
-- **Save layout**, or **Cancel**. The page says who changed the layout last and when.
-
-Accounts are created on the dashboard PC. Passwords are stored hashed in `data/users.json`:
-
-```bash
-python manage_users.py add manager1      # asks for the password
-python manage_users.py list
-python manage_users.py remove manager1
+```jinja
+{% set chassis_image = "chassis-top.svg" %}
+{% set tools = [
+    {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33},
+    {"t_no": "T23", "name": "Front/rear ARB",   "x": 78, "y": 67},
+] %}
 ```
 
-All runtime data lives in `line2_dashboard/data/` (not in git): `layouts.json` (+ `layouts.json.bak`), `users.json`,
-uploaded pictures in `data/chassis/`, and the session key. **Back up this folder.** On first start, `layouts.json` is
-created from `layouts.example.json`.
+- **`t_no`:** the wrench number as in `Torques_Actual_Data` (`T18` = WinCC `SA_T18`).
+- **`name`:** the text on the box. With `""`, the box shows `T_Name` from SQL.
+- **`x`, `y`:** where the circle sits on the picture, in **% from the left / top edge**. You don't have to guess these:
+  open **`http://<pc>:5001/station/<n>?setup=1`**, drag the circles onto the torque points, press **Copy**, and paste
+  the lines over the `tools` list in the template.
+- **`chassis_image`:** a file in `static/chassis/`. Each station can use its own picture.
 
-## Setup
+Save the file and refresh the browser; no restart is needed. The station's tile on the overview uses the same list.
+Circles in the top half of the picture get their box above the chassis, the others below.
+
+## Run
 
 ```bash
 pip install -r requirements.txt
 copy config.ini.example config.ini     # fill in SQL username / password
-python manage_users.py add <manager>   # one per line manager
-python app.py                          # run from inside line2_dashboard/
+python app.py                          # from inside line2_dashboard/
 ```
 
 Open `http://<pc>:5001/`. The andon dashboard uses port 5000. To try it without the database,
 set `demo_mode = true` in `config.ini`.
-
-## WinCC side
-
-See [wincc/README.md](wincc/README.md) for the VBScript that fills `Torques_Actual_Data`.
-
-## API
-
-- `GET /api/status`: all stations with their status, MAT and OK counts
-- `GET /api/station/<n>`: one station with its tools, marker positions, picture and layout
-- `GET /api/editor`, `POST /api/layout/<n>`, `POST /api/chassis-images`: layout editor (manager login + CSRF token)

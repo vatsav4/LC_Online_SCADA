@@ -1,0 +1,72 @@
+{#
+  Shared layout of every station page. Don't put station-specific things here:
+  each templates/station_<n>.html extends this and only sets `chassis_image` and `tools`.
+#}
+{% extends "base.html" %}
+{% block title %}Station {{ station_id }}{% endblock %}
+{% block center_title %}Station - {{ station_id }}{% endblock %}
+
+{% block content %}
+<div class="page-toolbar">
+  <a href="{{ url_for('index') }}" class="home-button">&larr; Home</a>
+  <div class="station-nav">
+    {% if station_id > 1 %}
+    <a href="{{ url_for('station', station_id=station_id - 1) }}" class="nav-button">&lsaquo; Station {{ station_id - 1 }}</a>
+    {% endif %}
+    {% if station_id < total_stations %}
+    <a href="{{ url_for('station', station_id=station_id + 1) }}" class="nav-button">Station {{ station_id + 1 }} &rsaquo;</a>
+    {% endif %}
+  </div>
+</div>
+
+<section class="plates">
+  <div class="plate">
+    <div class="plate-label">VC NUMBER</div>
+    <div class="plate-value" id="vc-number">{{ st.vc_number or '—' }}</div>
+  </div>
+  <div class="plate plate-wide">
+    <div class="plate-label">MAT NUMBER</div>
+    <div class="plate-value" id="mat-number">{{ st.mat_number or '—' }}</div>
+  </div>
+</section>
+
+<!-- Only with ?setup=1 in the address: drag circles, copy the generated lines into the template. -->
+<section class="setup-panel" id="setup-panel" hidden>
+  <div>
+    <b>Setup view.</b> Drag the circles onto the torque points, then copy these lines into
+    <code>templates/{{ 'station_%d.html' % station_id }}</code> (replace the existing <code>tools</code> list) and save the file.
+  </div>
+  <textarea id="setup-code" readonly rows="6" spellcheck="false"></textarea>
+  <button type="button" class="home-button" id="setup-copy">Copy</button>
+</section>
+
+<!--
+  Drawn by station.js from the station data (embedded below for the first paint, then
+  refreshed from /api/station/<id> every 2 s): callout boxes above / below the chassis,
+  a circle on each torque point and the leader lines between them.
+-->
+<section class="station-view" id="station-view">
+  <div class="status-ribbon ribbon-idle" id="status-ribbon"></div>
+  <div class="callouts callouts-top" id="callouts-top"></div>
+  <div class="chassis-box" id="chassis-box">
+    <img id="chassis-img" alt="Chassis" draggable="false"
+         src="{{ url_for('static', filename='chassis/' ~ st.image) }}">
+    <div class="markers" id="markers"></div>
+  </div>
+  <div class="callouts callouts-bottom" id="callouts-bottom"></div>
+  <svg class="leaders" id="leaders" aria-hidden="true"></svg>
+</section>
+
+<section class="unplaced" id="unplaced-section" hidden>
+  <h3 class="unplaced-title">No position given in the template (x / y missing)</h3>
+  <div class="tool-grid" id="unplaced"></div>
+</section>
+
+<p class="updated center" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</p>
+
+<script type="application/json" id="station-data">{{ st|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='station.js') }}" data-station-id="{{ station_id }}"></script>
+{% endblock %}

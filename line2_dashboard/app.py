@@ -1,35 +1,31 @@
 """
 Line-2 torque dashboard.
 
-Data (both on the Line-2 SQL Server, reachable only on port 49561):
-  dbo.Station_Mapping      vehicle (VC / MAT) at each station
-  dbo.Torques_Actual_Data  Set / Actual counts and bypass per wrench, written by the
-                           WinCC script wincc/Torques_To_SQL_Action.vbs
-([MAIN] source = logdump switches to the older smartapp log table, see logdump.py.)
+Two tables on the Line-2 SQL Server (reachable only on port 49561):
+  dbo.Station_Mapping      StationNumber, VC_Number, MAT_Number   (vehicle at each station)
+  dbo.Torques_Actual_Data  T_No, T_Name, Set_Counts, Actual_Counts, Active_Bypass
+                           (one row per wrench, written by wincc/Torques_To_SQL_Action.vbs)
 
-Which wrenches belong to a station, and where each torque point is on the
-chassis picture, comes from the station layouts (layouts.py), edited on the
-station page by logged-in line managers (auth.py, manage_users.py).
+Which wrenches a station shows, and where each circle sits on the chassis
+picture, is written in that station's template: templates/station_<n>.html
+    {% set tools = [ {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33}, ... ] %}
+The app reads that list from the template itself, so the station page and its
+tile on the overview always agree. Open /station/<n>?setup=1 to drag the
+circles and copy the x / y numbers into the template.
 
-A background thread polls SQL every few seconds and keeps the latest snapshot
-in memory; pages and JSON endpoints only read that snapshot.
+A background thread reads both tables every few seconds and keeps the latest
+values in memory; pages and JSON endpoints only read that snapshot.
 """
 
 import configparser
-import copy
 import logging
 import os
 import threading
 import time
 from datetime import datetime
 
-from flask import (Flask, abort, jsonify, redirect, render_template, request, send_file, session,
-                   url_for)
-
-import auth
-import layouts
-import logdump
-import torques
+from flask import Flask, abort, jsonify, render_template
+from jinja2 import nodes
 
 # ================= CONFIG =================
 # Real credentials belong in config.ini (gitignored), not in this file.
@@ -58,13 +54,8 @@ ODBC_DRIVER = _get("ODBC", "driver", "ODBC Driver 18 for SQL Server")
 POLL_INTERVAL = float(_get("MAIN", "poll_interval", "2"))
 WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon dashboard
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
-DEFAULT_IMAGE = _get("MAIN", "chassis_image", "chassis-top.svg")  # used until a station picks one
+TOTAL_STATIONS = int(_get("MAIN", "total_stations", "17"))
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
-SOURCE = _get("MAIN", "source", "torques").strip().lower()  # "torques" or "logdump"
-SECRET_KEY = _get("MAIN", "secret_key", "").strip()
-
-# Only for source = logdump: only read log rows for this shop_id_id.
-SHOP_ID = _get("FILTER", "shop_id", "").strip() or None
 
 # ================= LOGGING =================
 
@@ -72,13 +63,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("LINE2_DASHBOARD")
 
 # ================= SHARED STATE =================
-# raw = stations straight from SQL; stations = raw with the layouts applied.
+# Written only by poll_loop(), read only by routes/API handlers.
 
 state_lock = threading.Lock()
 state = {
-    "raw": {},
-    "stations": {},  # {station_no: {station, vc_number, mat_number, status, image, tools: [...]}}
-    "known_tools": [],  # every wrench number seen in the data (for the layout editor)
+    "mapping": {},   # {station_no: {"vc": .., "mat": ..}}
+    "torques": {},   # {"T1": {"name": .., "set": .., "actual": .., "bypass": bool}}
     "updated_at": None,
     "db_ok": False,
 }
@@ -101,50 +91,58 @@ def connect(cfg):
     )
 
 
-def load_raw():
-    """Read the configured source. Returns (raw_stations, known_tool_numbers)."""
-    if SOURCE == "logdump":
-        if DEMO_MODE:
-            import demo_data
-            rows = demo_data.station_rows()
-        else:
-            conn = connect(LINE_DB)
-            try:
-                rows = logdump.fetch_station_rows(conn, SHOP_ID)
-            finally:
-                conn.close()
-        raw = logdump.build_stations(rows)
-        known = sorted({t["tag"] for st in raw.values() for t in st["tools"]}, key=logdump._tag_key)
-        return raw, known
-
-    if DEMO_MODE:
-        import demo_data
-        mapping, torque_rows = demo_data.mapping_rows(), demo_data.torque_rows()
-    else:
-        conn = connect(LINE_DB)
-        try:
-            mapping, torque_rows = torques.fetch(conn)
-        finally:
-            conn.close()
-    return torques.build_stations(mapping, torque_rows, layouts.load()), torques.all_tool_numbers(torque_rows)
+def _num(value):
+    if value is None or value == "":
+        return None
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(num) if num.is_integer() else num
 
 
-def publish(raw, known=None, db_ok=True):
-    """Apply the current layouts to raw data and make it the live snapshot."""
-    stations = layouts.apply(copy.deepcopy(raw), layouts.load(), DEFAULT_IMAGE)
-    with state_lock:
-        state["raw"] = raw
-        state["stations"] = stations
-        if known is not None:
-            state["known_tools"] = known
-        state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        state["db_ok"] = db_ok
+def fetch_tables(conn):
+    cur = conn.cursor()
+    cur.execute("SELECT StationNumber, VC_Number, MAT_Number FROM dbo.Station_Mapping")
+    mapping = {int(r[0]): {"vc": str(r[1] or "").strip(), "mat": str(r[2] or "").strip()}
+               for r in cur.fetchall()}
+    cur.execute("SELECT T_No, T_Name, Set_Counts, Actual_Counts, Active_Bypass FROM dbo.Torques_Actual_Data")
+    torques = {str(r[0]).strip().upper(): {"name": str(r[1] or "").strip(), "set": _num(r[2]),
+                                           "actual": _num(r[3]), "bypass": r[4] in (True, 1, "1")}
+               for r in cur.fetchall() if r[0]}
+    return mapping, torques
+
+
+def demo_tables():
+    """Sample data for demo_mode = true (no database). T2 / T3 count up so the page looks live."""
+    tick = int(time.time() // 3)
+    mapping = {1: ("55072654300R", "MAT784062TFJ12788"), 2: ("55072654300R", "MAT784062TFJ12787"),
+               4: ("55329329000R", "MAT805017TFJ12785"), 5: ("55131252100R", "MAT513357TFJ12784"),
+               8: ("55131252100R", "MAT513357TFJ12781"), 10: ("55131252100R", "MAT513357TFJ12779")}
+    torques = {"T1": ("SG Tightening", 5, 5, 0), "T2": ("Tail Tightening", 5, tick % 7, 0),
+               "T3": ("Nylon Tightening", 5, (tick + 3) % 7, 0), "T18": ("ARB bolt fitment", 4, 0, 0),
+               "T19": ("Axle brake hose", 1, 8, 0), "T23": ("Front/rear ARB", 4, 0, 0),
+               "T26": ("Brake hose adapter", 2, 2, 1), "T37": ("Steering return line", 2, 10, 0),
+               "T38": ("Urea tank fitment", 6, 6, 1), "T39": ("EGP clamp bolt", 2, 11, 1),
+               "T40": ("Air tank bracket", 4, 10, 1)}
+    return ({n: {"vc": vc, "mat": mat} for n, (vc, mat) in mapping.items()},
+            {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()})
 
 
 def poll_once():
     try:
-        raw, known = load_raw()
-        publish(raw, known)
+        if DEMO_MODE:
+            mapping, torques = demo_tables()
+        else:
+            conn = connect(LINE_DB)
+            try:
+                mapping, torques = fetch_tables(conn)
+            finally:
+                conn.close()
+        with state_lock:
+            state["mapping"], state["torques"] = mapping, torques
+            state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            state["db_ok"] = True
     except Exception as e:
         logger.error(f"Poll failed: {e}")
         with state_lock:
@@ -160,147 +158,138 @@ def poll_loop():
 # ================= FLASK APP =================
 
 app = Flask(__name__)
-app.config.update(
-    SECRET_KEY=auth.secret_key(SECRET_KEY),
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    MAX_CONTENT_LENGTH=8 * 1024 * 1024,  # chassis picture uploads
-)
+app.config["TEMPLATES_AUTO_RELOAD"] = True  # edited station templates show up on refresh
 
 
-@app.context_processor
-def _globals():
-    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE,
-            "user": auth.current_user(), "csrf_token": auth.csrf_token()}
+# ---------- station templates ----------
+
+def station_template(station_id):
+    name = f"station_{station_id}.html"
+    if os.path.exists(os.path.join(app.root_path, "templates", name)):
+        return name
+    return "station_generic.html"
+
+
+_template_cache = {}  # template file -> (mtime, config)
+
+
+def station_config(station_id):
+    """The `chassis_image` and `tools` set at the top of templates/station_<n>.html.
+
+    Re-read automatically when the template file changes, so editing T_Nos
+    needs no restart (only a browser refresh).
+    """
+    name = station_template(station_id)
+    path = os.path.join(app.root_path, "templates", name)
+    mtime = os.path.getmtime(path)
+    cached = _template_cache.get(path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+
+    found = {}
+    with open(path, encoding="utf-8") as f:
+        tree = app.jinja_env.parse(f.read())
+    for node in tree.find_all(nodes.Assign):
+        if isinstance(node.target, nodes.Name) and node.target.name in ("tools", "chassis_image"):
+            try:
+                found[node.target.name] = node.node.as_const()
+            except nodes.Impossible:
+                logger.error(f"{name}: '{node.target.name}' must be written out literally")
+
+    tools = []
+    for t in found.get("tools") or []:
+        if not isinstance(t, dict) or not str(t.get("t_no", "")).strip():
+            logger.error(f"{name}: every tool needs a t_no, skipped {t!r}")
+            continue
+        x, y = t.get("x"), t.get("y")
+        placed = isinstance(x, (int, float)) and isinstance(y, (int, float))
+        tools.append({"t_no": str(t["t_no"]).strip().upper(), "name": str(t.get("name") or "").strip(),
+                      "x": min(100, max(0, x)) if placed else None,
+                      "y": min(100, max(0, y)) if placed else None})
+    config = {"chassis_image": found.get("chassis_image") or "chassis-top.svg", "tools": tools}
+    _template_cache[path] = (mtime, config)
+    return config
+
+
+def build_station(station_id, mapping, torques):
+    config = station_config(station_id)
+    vehicle = mapping.get(station_id, {})
+    tools = []
+    for t in config["tools"]:
+        row = torques.get(t["t_no"])
+        if row is None or row["set"] is None or row["actual"] is None:
+            status = "PENDING"
+        else:
+            status = "OK" if row["actual"] >= row["set"] else "NOT OK"
+        tools.append({
+            "tag": t["t_no"],
+            "label": t["name"] or (row or {}).get("name") or t["t_no"],
+            "x": t["x"], "y": t["y"],
+            "set": (row or {}).get("set"),
+            "actual": (row or {}).get("actual"),
+            "mode": "BYPASS" if (row or {}).get("bypass") else ("ACTIVE" if row else ""),
+            "status": status,
+        })
+    return {
+        "station": station_id,
+        "vc_number": vehicle.get("vc", ""),
+        "mat_number": vehicle.get("mat", ""),
+        "image": config["chassis_image"],
+        "tools": tools,
+        "status": "idle" if not tools else ("green" if all(t["status"] == "OK" for t in tools) else "red"),
+    }
 
 
 def _snapshot():
     with state_lock:
-        return dict(state["stations"]), state["db_ok"], state["updated_at"]
+        return dict(state["mapping"]), dict(state["torques"]), state["db_ok"], state["updated_at"]
+
+
+def _all_stations():
+    mapping, torques, db_ok, updated_at = _snapshot()
+    stations = [build_station(n, mapping, torques) for n in range(1, TOTAL_STATIONS + 1)]
+    return stations, db_ok, updated_at
 
 
 def _summary(stations):
-    return [
-        {"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
-         "ok": sum(t["status"] == "OK" for t in st["tools"]), "total": len(st["tools"])}
-        for st in (stations[n] for n in sorted(stations))
-    ]
+    return [{"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
+             "ok": sum(t["status"] == "OK" for t in st["tools"]), "total": len(st["tools"])}
+            for st in stations]
+
+
+@app.context_processor
+def _globals():
+    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE}
 
 
 @app.route("/")
 def index():
-    stations, db_ok, updated_at = _snapshot()
+    stations, db_ok, updated_at = _all_stations()
     return render_template("index.html", stations=_summary(stations), db_ok=db_ok, updated_at=updated_at)
 
 
 @app.route("/station/<int:station_id>")
 def station(station_id):
-    stations, db_ok, updated_at = _snapshot()
-    if station_id not in stations and stations:
+    if not 1 <= station_id <= TOTAL_STATIONS:
         abort(404)
-    return render_template("station.html", station_id=station_id, st=stations.get(station_id),
-                           last_station=max(stations, default=station_id),
-                           db_ok=db_ok, updated_at=updated_at)
+    mapping, torques, db_ok, updated_at = _snapshot()
+    return render_template(station_template(station_id), station_id=station_id,
+                           st=build_station(station_id, mapping, torques),
+                           total_stations=TOTAL_STATIONS, db_ok=db_ok, updated_at=updated_at)
 
-
-@app.route("/chassis/<name>")
-def chassis_image(name):
-    path = layouts.image_path(name)
-    if not path:
-        abort(404)
-    return send_file(path, max_age=3600)
-
-
-# ---------- login ----------
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    error = None
-    next_url = request.values.get("next") or url_for("index")
-    if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = url_for("index")
-    if request.method == "POST":
-        auth.check_form_csrf()
-        username = request.form.get("username", "").strip()
-        if auth.check_login(username, request.form.get("password", "")):
-            session.clear()
-            session["user"] = username
-            logger.info(f"Login: {username}")
-            return redirect(next_url)
-        error = "Wrong username or password."
-    return render_template("login.html", error=error, next_url=next_url, db_ok=_snapshot()[1])
-
-
-@app.route("/logout", methods=["POST"])
-def logout():
-    auth.check_form_csrf()
-    session.clear()
-    next_url = request.form.get("next") or ""
-    if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = url_for("index")
-    return redirect(next_url)
-
-
-# ---------- JSON API ----------
 
 @app.route("/api/status")
 def api_status():
-    stations, db_ok, updated_at = _snapshot()
+    stations, db_ok, updated_at = _all_stations()
     return jsonify({"stations": _summary(stations), "db_ok": db_ok, "updated_at": updated_at})
 
 
 @app.route("/api/station/<int:station_id>")
 def api_station(station_id):
-    stations, db_ok, updated_at = _snapshot()
-    if station_id not in stations:
+    if not 1 <= station_id <= TOTAL_STATIONS:
         abort(404)
-    return jsonify({**stations[station_id], "db_ok": db_ok, "updated_at": updated_at,
-                    "can_edit": bool(auth.current_user())})
-
-
-@app.route("/api/editor")
-@auth.manager_required
-def api_editor():
-    """What the layout editor needs: wrench numbers, which station has each, and pictures."""
-    with state_lock:
-        known = list(state["known_tools"])
-        stations = dict(state["stations"])
-    assigned = {t["tag"]: n for n, st in stations.items() for t in st["tools"]}
-    return jsonify({"tools": sorted(set(known) | set(assigned), key=logdump._tag_key),
-                    "assigned": assigned, "images": layouts.list_images()})
-
-
-@app.route("/api/layout/<int:station_id>", methods=["POST"])
-@auth.manager_required
-def api_save_layout(station_id):
-    if not 1 <= station_id <= 999:
-        abort(404)
-    try:
-        saved = layouts.save(station_id, request.get_json(silent=True), auth.current_user())
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    logger.info(f"Layout of station {station_id} saved by {auth.current_user()}")
-    with state_lock:
-        raw = state["raw"]
-    if SOURCE == "torques":
-        poll_once()  # wrench list per station comes from the layout - rebuild now
-    else:
-        publish(raw, db_ok=_snapshot()[1])
-    return jsonify({"ok": True, "layout": saved})
-
-
-@app.route("/api/chassis-images", methods=["POST"])
-@auth.manager_required
-def api_upload_image():
-    file = request.files.get("image")
-    if not file:
-        return jsonify({"error": "No file received."}), 400
-    try:
-        name = layouts.save_upload(file.filename, file.read())
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    logger.info(f"Chassis image {name} uploaded by {auth.current_user()}")
-    return jsonify({"ok": True, "name": name, "images": layouts.list_images()})
+    mapping, torques, db_ok, updated_at = _snapshot()
+    return jsonify({**build_station(station_id, mapping, torques), "db_ok": db_ok, "updated_at": updated_at})
 
 
 if __name__ == "__main__":

@@ -1,0 +1,17 @@
+{% extends "station_base.html" %}
+{#
+  Station 5 - which torque wrenches are shown, and where.
+
+    t_no  wrench number as in Torques_Actual_Data / WinCC (T1 = SA_T1, T2 = SA_T2, ...)
+    name  text on the box ("" = use T_Name from SQL)
+    x, y  where the circle sits on the chassis picture, in % from the left / top edge.
+          Easiest: open /station/5?setup=1, drag the circles and copy the lines shown.
+
+  chassis_image: a picture in static/chassis/ (put your own photo/drawing there).
+  Saving this file is enough - no restart needed, just refresh the browser.
+#}
+{% set chassis_image = "chassis-top.svg" %}
+{% set tools = [
+    {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33},
+    {"t_no": "T23", "name": "Front/rear ARB", "x": 78, "y": 67},
+] %}

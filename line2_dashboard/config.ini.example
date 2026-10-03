@@ -18,6 +18,7 @@ shop_id =
 
 [MAIN]
 ; sql   = read Station_Mapping + log table (SQL section above)
+; wincc = read dbo.Line2_Tool_Status written by the WinCC VBScript (see wincc/README.md)
 ; opcua = read live tags from the SCADA's OPC UA server (OPCUA section below)
 source = sql
 poll_interval = 2
@@ -28,6 +29,13 @@ line_title = Line - 2 | Assembly Shop
 chassis_image = chassis.svg
 ; true = run on built-in sample rows, no database needed.
 demo_mode = false
+
+[WINCC]
+; Only used when [MAIN] source = wincc.
+; Show Offline if the WinCC script's heartbeat is older than this (seconds).
+heartbeat_timeout = 90
+; Take VC/MAT from Station_Mapping for stations where WinCC has no MAT/VC tags.
+mat_from_mapping = true
 
 [OPCUA]
 ; Only used when [MAIN] source = opcua.

@@ -11,9 +11,9 @@
 '     Active_Bypass = SA_Tn.Active_Bypass    (1 = bypass, 0 = active)
 ' A row is inserted the first time a wrench is seen and updated afterwards.
 '
-' Uses the project's existing SQL connection (Local_Connection_Init /
-' Local_Connection, same as the Station_Mapping script), so no server name,
-' user or password is needed here.
+' Uses its OWN SQL connection (not the shared Local_Connection of the
+' Station_Mapping script), so the two scripts can never disturb each other.
+' Fill in User ID and Password in CONN_STR below.
 '
 ' Kept light on WinCC:
 '   * all wrench tags are read in ONE TagSet call (from WinCC's tag cache)
@@ -29,6 +29,8 @@ Function action
     On Error Resume Next
 
     ' ---- settings ----------------------------------------------------------------
+    ' Line-2 SQL Server: note the COMMA before the port. Edit User ID / Password.
+    Const CONN_STR = "Provider=SQLOLEDB;Data Source=172.25.208.39,49561;Initial Catalog=Industry4_157;User ID=CHANGE_ME;Password=CHANGE_ME;"
     Const TOOL_COUNT = 42                ' wrenches SA_T1 ... SA_T42
     Const T_NO_PREFIX = "T"              ' T_No written as 'T1','T2',... ; "" if T_No is a number column
     Const BYPASS_COLUMN = "Active_Bypass" ' name of the new bypass column in Torques_Actual_Data
@@ -126,18 +128,14 @@ Function action
 
     If batch = "" Then Exit Function
 
-    ' ---- 3. existing project connection, short timeouts, one round trip ----------
-    ' If an earlier script run left the shared connection open, close it first.
+    ' ---- 3. own short connection, short timeouts, one round trip ------------------
+    Dim conn
+    Set conn = CreateObject("ADODB.Connection")
+    conn.ConnectionTimeout = TIMEOUT_S
+    conn.CommandTimeout = TIMEOUT_S
     Err.Clear
-    If Local_Connection.State <> 0 Then Local_Connection.Close
-    Err.Clear
-
-    Local_Connection_Init
-    Local_Connection.ConnectionTimeout = TIMEOUT_S
-    Local_Connection.CommandTimeout = TIMEOUT_S
-    Err.Clear
-    Local_Connection.Open
-    If Err.Number = 0 Then Local_Connection.Execute batch, , 129   ' adCmdText (1) + adExecuteNoRecords (128)
+    conn.Open CONN_STR
+    If Err.Number = 0 Then conn.Execute batch, , 129   ' adCmdText (1) + adExecuteNoRecords (128)
 
     If Err.Number <> 0 Then
         HMIRuntime.Trace "Torques_To_SQL: SQL write failed, pausing " & BACKOFF_S & " s: " & Err.Description & vbCrLf
@@ -168,5 +166,6 @@ Function action
     End If
 
     Err.Clear
-    Local_Connection.Close
+    conn.Close
+    Set conn = Nothing
 End Function

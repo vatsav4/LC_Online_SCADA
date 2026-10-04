@@ -3,16 +3,19 @@
 {% block center_title %}All Stations{% endblock %}
 
 {% block content %}
-<!-- Home page: the line photo (static/Background.jpg) with a frosted panel of station buttons, as in the slide. -->
+<!-- Home page: the line photo (static/Background.jpg) with the station panel on the right. -->
 <section class="home-hero" style="background-image: url('{{ url_for('static', filename='Background.jpg') }}')">
-  <div class="home-panel">
-    <div class="home-panel-head">
-      <span class="home-legend">
-        <span><i class="swatch tile-green"></i>All torques OK</span>
-        <span><i class="swatch tile-red"></i>Torque NOT OK / awaiting</span>
-        <span><i class="swatch tile-idle"></i>No wrenches set up</span>
-      </span>
-      <span class="updated" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</span>
+  <aside class="home-panel">
+    <div class="home-panel-title">Station Status</div>
+    <div class="home-summary" id="home-summary">
+      <span class="sum-bad"><b>{{ stations|selectattr('status', 'equalto', 'red')|list|length }}</b> NOT OK</span>
+      <span class="sum-ok"><b>{{ stations|selectattr('status', 'equalto', 'green')|list|length }}</b> OK</span>
+      <span class="sum-idle"><b>{{ stations|selectattr('status', 'equalto', 'idle')|list|length }}</b> not set up</span>
+    </div>
+    <div class="home-legend">
+      <span><i class="swatch tile-green"></i>All torques OK</span>
+      <span><i class="swatch tile-red"></i>NOT OK / awaiting</span>
+      <span><i class="swatch tile-idle"></i>No wrenches set up</span>
     </div>
     <div class="station-grid" id="station-grid">
       {% for st in stations %}
@@ -23,7 +26,8 @@
       </a>
       {% endfor %}
     </div>
-  </div>
+    <div class="updated" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</div>
+  </aside>
 </section>
 {% endblock %}
 

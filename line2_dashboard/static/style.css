@@ -95,56 +95,72 @@ body {
 .home-button:hover, .nav-button:hover { transform: translateY(-1px); }
 .home-button:hover { background: var(--navy-light); }
 
-/* ---------- home page: line photo + frosted panel of station buttons ---------- */
+/* ---------- home page: line photo + station panel on the right ---------- */
 .content:has(.home-hero) { padding: 0; }
 .home-hero {
-  position: relative;
   height: calc(100vh - var(--topbar-h) - var(--footer-h));
   background-size: cover;
   background-position: center 30%;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 0 3% 3.5vh;
+  justify-content: flex-end;  /* panel on the right: keeps the station signboards on the left visible */
+  padding: 2.5vh 2.5%;
 }
 .home-panel {
-  width: 100%;
-  max-width: 1500px;
-  background: rgba(255, 255, 255, 0.72);
+  width: clamp(360px, 23vw, 460px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(11, 31, 58, 0.8);
   backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(216, 185, 106, 0.45);
   border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  padding: 1rem 1.5rem 1.4rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  padding: 1rem 1.3rem 0.8rem;
+  color: #fff;
 }
-.home-panel-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.9rem; }
-.home-legend { display: flex; gap: 1.25rem; font-size: 0.85rem; color: #334; }
-.home-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
-.swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-.updated { color: #556; font-size: 0.85rem; margin-left: auto; }
-.updated.center { text-align: center; }
+.home-panel-title {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.home-summary { display: flex; gap: 1.1rem; margin: 0.45rem 0 0.35rem; font-size: 0.95rem; }
+.home-summary b { font-size: 1.35rem; margin-right: 0.2rem; }
+.sum-bad b { color: #ff7a7a; }
+.sum-ok b { color: #5fdc7f; }
+.sum-idle b { color: #6cc6e6; }
+.home-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.75rem; color: #c9d3de; margin-bottom: 0.8rem; }
+.home-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.updated { color: #9fb0c2; font-size: 0.75rem; }
+.home-panel .updated { margin-top: 0.6rem; text-align: right; }
+.updated.center { text-align: center; color: #667; }
 
+/* 3 columns; the 6 rows share the panel height so the buttons fill it */
 .station-grid {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 1rem 1.2rem;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 0.7rem;
+  min-height: 0;
 }
 .station-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.7rem 0.4rem 0.6rem;
+  justify-content: center;
+  gap: 0.25rem;
   border-radius: 8px;
-  border: 2px solid rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   text-decoration: none;
   color: #fff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
   transition: background-color 0.3s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.station-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3); }
-.tile-name { font-size: 1.45rem; font-weight: 700; }
-.tile-count { font-size: 0.75rem; background: rgba(0, 0, 0, 0.18); padding: 0.05rem 0.55rem; border-radius: 10px; }
+.station-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); }
+.tile-name { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.tile-count { font-size: 0.75rem; background: rgba(0, 0, 0, 0.2); padding: 0.05rem 0.55rem; border-radius: 10px; }
 
 .tile-green { background: var(--green); }
 .tile-red { background: var(--red); }

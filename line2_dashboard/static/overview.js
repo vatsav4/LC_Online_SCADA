@@ -20,6 +20,13 @@
         el.classList.add("tile-" + st.status);
         el.querySelector(".tile-count").textContent = st.ok + "/" + st.total + " OK";
       });
+      const count = s => data.stations.filter(st => st.status === s).length;
+      const sum = document.getElementById("home-summary");
+      if (sum) {
+        sum.querySelector(".sum-bad b").textContent = count("red");
+        sum.querySelector(".sum-ok b").textContent = count("green");
+        sum.querySelector(".sum-idle b").textContent = count("idle");
+      }
       setConnection(data.db_ok, data.updated_at);
     } catch (err) {
       setConnection(false);

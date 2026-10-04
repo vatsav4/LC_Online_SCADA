@@ -1,5 +1,7 @@
 /* Same look as the Line-3 andon dashboard (navy/gold topbar, green/red tiles). */
 :root {
+  /* screen height used by everything on a station page except the chassis picture */
+  --chassis-reserve: 330px;  /* upper limit only - station.js shrinks it until nothing scrolls */
   --topbar-h: 66px;
   --footer-h: 37px;
   --navy: #0b1f3a;
@@ -205,9 +207,9 @@ body {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 2.4rem 1.5rem 1rem;
+  padding: 2.4rem 1.5rem 1.4rem;
   margin: 0 auto;
-  max-width: 1500px;
+  max-width: 1800px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
 }
 .status-ribbon {
@@ -245,15 +247,33 @@ body {
 .chassis-box {
   position: relative;
   width: fit-content;
-  margin: 1.6rem auto;
+  max-width: 100%;
+  margin: 1.1rem auto;
   z-index: 1;
 }
+/* The pictures are trimmed to the chassis, so let it grow: as wide as the panel allows,
+   but never taller than what is left of the screen after the boxes above and below. */
 .chassis-box img {
   display: block;
-  height: clamp(120px, calc(100vh - 530px), 420px);
   width: auto;
+  height: auto;
   max-width: 100%;
+  max-height: max(120px, calc(100vh - var(--chassis-reserve)));
   user-select: none;
+  mix-blend-mode: multiply;  /* the pictures' off-white background melts into the white panel */
+}
+
+/* short desktop screens (e.g. 1366x768): more compact boxes leave more room for the chassis */
+@media (max-height: 760px) {
+  .station-top { margin-bottom: 0.5rem; }
+  .plate { padding: 0.2rem 1.5rem 0.3rem; }
+  .plate-value { font-size: 1.3rem; }
+  .station-view { padding-top: 2.1rem; padding-bottom: 1.2rem; }
+  .chassis-box { margin: 0.7rem auto; }
+  .tool-box { padding: 0.35rem 0.8rem 0.4rem; width: 230px; }
+  .tool-title { font-size: 0.95rem; }
+  .tool-row { font-size: 0.95rem; }
+  .bar { margin-top: 0.25rem; }
 }
 .markers { position: absolute; inset: 0; }
 
@@ -341,9 +361,9 @@ body {
 .bar { height: 5px; margin-top: 0.4rem; background: rgba(0, 0, 0, 0.18); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: rgba(255, 255, 255, 0.85); transition: width 0.3s ease; }
 
-.unplaced { max-width: 1500px; margin: 0.8rem auto 0; }
+.unplaced { max-width: 1800px; margin: 0.8rem auto 0; }
 .unplaced-title { text-align: center; color: #556; font-size: 0.95rem; margin: 0 0 0.5rem; }
-.updated.center { margin: 0.5rem 0 0; }
+.station-view .updated { position: absolute; right: 1rem; bottom: 0.35rem; font-size: 0.72rem; color: #889; }
 
 /* manager edit bar */
 .edit-bar {

@@ -77,6 +77,20 @@
     $("markers").innerHTML = placed.map(marker).join("");
     $("unplaced").innerHTML = unplaced.map(card).join("");
     $("unplaced-section").hidden = !unplaced.length;
+    fitToScreen();
+  }
+
+  // Make the chassis as big as possible while the whole page (boxes above and below,
+  // un-placed boxes, footer) still fits on one screen without a scroll bar.
+  function fitToScreen() {
+    const img = $("chassis-img");
+    if (!img || !img.naturalWidth) { drawLeaders(); return; }
+    img.style.maxHeight = "";                       // start from the CSS upper limit
+    const overflow = document.documentElement.scrollHeight - window.innerHeight;
+    if (overflow > 0) {
+      const h = img.getBoundingClientRect().height;
+      img.style.maxHeight = Math.max(120, Math.floor(h - overflow)) + "px";
+    }
     drawLeaders();
   }
 
@@ -204,7 +218,8 @@
     }
   }
 
-  $("chassis-img").addEventListener("load", drawLeaders);
+  $("chassis-img").addEventListener("load", fitToScreen);
+  window.addEventListener("resize", fitToScreen);
   if (window.ResizeObserver) new ResizeObserver(drawLeaders).observe($("station-view"));
 
   render();

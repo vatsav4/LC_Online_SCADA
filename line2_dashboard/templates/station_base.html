@@ -57,6 +57,7 @@
   </div>
   <div class="callouts callouts-bottom" id="callouts-bottom"></div>
   <svg class="leaders" id="leaders" aria-hidden="true"></svg>
+  <span class="updated" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</span>
 </section>
 
 <section class="unplaced" id="unplaced-section" hidden>
@@ -64,7 +65,6 @@
   <div class="tool-grid" id="unplaced"></div>
 </section>
 
-<p class="updated center" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</p>
 
 <script type="application/json" id="station-data">{{ st|tojson }}</script>
 {% endblock %}

@@ -26,12 +26,15 @@ def test_station_5_template_lists_its_wrenches():
 def test_template_edits_are_picked_up_without_restart(tmp_path, monkeypatch):
     (tmp_path / "templates").mkdir()
     page = tmp_path / "templates" / "station_99.html"
-    page.write_text('{% extends "station_base.html" %}{% set tools = [{"t_no": "t7", "name": "A", "x": 150, "y": 10}] %}')
+    page.write_text('{% extends "station_base.html" %}{% set tools = [{"t_no": "t7", "x": 150, "y": 10}] %}')
     monkeypatch.setattr(line2.app, "root_path", str(tmp_path))
-    assert line2.station_config(99)["tools"] == [{"t_no": "T7", "name": "A", "x": 100, "y": 10}]
-    page.write_text('{% extends "station_base.html" %}{% set tools = [{"t_no": "T8"}, {"name": "no t_no"}] %}')
+    cfg = line2.station_config(99)
+    assert cfg["tools"] == [{"t_no": "T7", "x": 100, "y": 10}] and cfg["chassis_image"] == "IMG_1.jpg"
+    page.write_text('{% extends "station_base.html" %}{% set chassis_image = "IMG_3.jpg" %}'
+                    '{% set tools = [{"t_no": "T8"}, {"x": 5}] %}')
     os.utime(page, (time.time() + 5, time.time() + 5))
-    assert line2.station_config(99)["tools"] == [{"t_no": "T8", "name": "", "x": None, "y": None}]
+    cfg = line2.station_config(99)
+    assert cfg["tools"] == [{"t_no": "T8", "x": None, "y": None}] and cfg["chassis_image"] == "IMG_3.jpg"
 
 
 def test_build_station_statuses():
@@ -41,7 +44,7 @@ def test_build_station_statuses():
     st = line2.build_station(5, mapping, torques)
     assert (st["vc_number"], st["mat_number"], st["status"]) == ("VC5", "MAT5", "red")
     t18, t23 = st["tools"]
-    assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB bolt fitment")
+    assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB")   # name from SQL
     assert t23["status"] == "NOT OK"
     assert line2.build_station(5, mapping, {})["tools"][0]["status"] == "PENDING"
     assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no wrenches in template
@@ -82,10 +85,11 @@ def test_pages_and_api(client):
     st1 = client.get("/api/station/1").get_json()
     assert [t["tag"] for t in st1["tools"]] == ["T1", "T2", "T3"] and st1["tools"][0]["x"] == 16
     page = client.get("/station/5").get_data(as_text=True)
-    assert "MAT513357TFJ12784" in page and "chassis/chassis-top.svg" in page and "Manager login" in page and "edit-toggle" not in page
+    assert "MAT513357TFJ12784" in page and "chassis/IMG_2.jpg" in page and "Manager login" in page and "edit-toggle" not in page
     assert client.get("/station/3").status_code == 200
     assert client.get("/station/18").status_code == 404
-    assert client.get("/").status_code == 200
+    home = client.get("/").get_data(as_text=True)
+    assert "Background.jpg" in home and ">St17<" in home
 
 
 # ---------------- manager login + saving positions into the template ----------------
@@ -128,10 +132,10 @@ def test_save_positions_needs_login_and_rewrites_template(client, station_copy):
     res = client.post("/api/station/5/positions", json=body, headers={"X-CSRF-Token": _csrf(client)})
     assert res.status_code == 200, res.get_json()
     text = (station_copy / "station_5.html").read_text()
-    assert '{"t_no": "T18", "name": "ARB bolt fitment", "x": 44.6, "y": 75.9},' in text
-    assert '{"t_no": "T23", "name": "Front/rear ARB", "x": 78, "y": 67},' in text   # untouched
+    assert '{"t_no": "T18", "x": 44.6, "y": 75.9},' in text
+    assert '{"t_no": "T23", "x": 78, "y": 67},' in text   # untouched
     assert "positions last saved" in text and "by Manager1" in text
-    assert "Station 5 - which torque wrenches" in text                             # comments kept
+    assert "Station 5 - which torque wrenches" in text and 'chassis_image = "IMG_2.jpg"' in text  # rest kept
     assert (station_copy / "station_5.html.bak").exists()
     st5 = client.get("/api/station/5").get_json()
     assert [(t["tag"], t["x"], t["y"]) for t in st5["tools"]] == [("T18", 44.6, 75.9), ("T23", 78, 67)]

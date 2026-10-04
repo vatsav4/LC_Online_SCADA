@@ -29,27 +29,38 @@ templates/login.html         manager login page
 templates/station_base.html  shared look of all station pages
 templates/base.html, index.html
 static/station.js            draws circles, boxes and lines; refreshes every 2 s
-static/chassis/              chassis pictures (put your own here)
+static/chassis/              chassis pictures, one per stage (IMG_1..IMG_5.jpg)
+static/Background.jpg        line photo behind the home page's station buttons
+static/logo.png              logo in the top bar
 wincc/                       the WinCC VBScript that fills Torques_Actual_Data
 ```
 
 ## Adding wrenches to a station
 
-Open `templates/station_<n>.html` and list the wrenches:
+Open `templates/station_<n>.html`. It only holds the picture and the wrench numbers:
 
 ```jinja
-{% set chassis_image = "chassis-top.svg" %}
+{% set chassis_image = "IMG_2.jpg" %}
 {% set tools = [
-    {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33},
-    {"t_no": "T23", "name": "Front/rear ARB",   "x": 78, "y": 67},
+    {"t_no": "T18", "x": 16, "y": 33},
+    {"t_no": "T23", "x": 78, "y": 67},
 ] %}
 ```
 
-- **`t_no`:** the wrench number as in `Torques_Actual_Data` (`T18` = WinCC `SA_T18`).
-- **`name`:** the text on the box. With `""`, the box shows `T_Name` from SQL.
-- **`x`, `y`:** where the circle sits on the picture, in **% from the left / top edge**. You don't have to type these;
-  line managers set them on the page (see below).
-- **`chassis_image`:** a file in `static/chassis/`. Each station can use its own picture.
+- **`t_no`:** the wrench number as in `Torques_Actual_Data` (`T18` = WinCC `SA_T18`). The name on the box always comes
+  from `T_Name` in SQL.
+- **`x`, `y`:** where the circle sits on the picture, in % from the left / top edge. Line managers set these on the page
+  (see below). For a new wrench, just write `{"t_no": "T5"}`. It shows below the picture until a manager places it.
+- **`chassis_image`:** the picture of the chassis at this station's stage, from `static/chassis/`. Each template's
+  comment lists the available pictures:
+
+  | Picture | Shows | Used by default for |
+  |---|---|---|
+  | `IMG_1.jpg` | bare frame (top view) | stations 1-3 |
+  | `IMG_2.jpg` | axles fitted (top view) | stations 4-6 |
+  | `IMG_3.jpg` | engine + driveline (top view) | stations 7-10 |
+  | `IMG_4.jpg` | side view, cab frame | stations 11-14 |
+  | `IMG_5.jpg` | side view, complete with wheels | stations 15-17 |
 
 Save the file and refresh the browser; no restart is needed. The station's tile on the overview uses the same list.
 Circles in the top half of the picture get their box above the chassis, the others below.
@@ -62,7 +73,7 @@ Circles in the top half of the picture get their box above the chassis, the othe
 3. They click **Edit positions**, drag the circles onto the torque points, and press **Save positions**.
 
 Save writes the new `x` / `y` straight into `templates/station_<n>.html` and adds a "positions last saved … by …" line.
-Wrench numbers, names and comments stay as they are. The previous version is kept as `station_<n>.html.bak`.
+Wrench numbers, the picture and comments stay as they are. The previous version is kept as `station_<n>.html.bak`.
 Viewing the dashboard needs no login.
 
 ## Run

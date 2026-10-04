@@ -8,7 +8,10 @@ Two tables on the Line-2 SQL Server (reachable only on port 49561):
 
 Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
-    {% set tools = [ {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33}, ... ] %}
+    {% set chassis_image = "IMG_2.jpg" %}
+    {% set tools = [ {"t_no": "T18", "x": 16, "y": 33}, ... ] %}
+Only the wrench number (and circle position) is in the template; the name on the
+box always comes from T_Name in SQL.
 The app reads that list from the template itself, so the station page and its
 tile on the overview always agree.
 
@@ -67,6 +70,7 @@ POLL_INTERVAL = float(_get("MAIN", "poll_interval", "2"))
 WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon dashboard
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
 TOTAL_STATIONS = int(_get("MAIN", "total_stations", "17"))
+DEFAULT_IMAGE = "IMG_1.jpg"  # static/chassis/ picture for a station template that doesn't set one
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
 # Signs the login cookie. Empty = random at every start (managers just log in again after a restart).
 SECRET_KEY = _get("MAIN", "secret_key", "").strip() or secrets.token_hex(32)
@@ -224,10 +228,10 @@ def station_config(station_id):
             continue
         x, y = t.get("x"), t.get("y")
         placed = isinstance(x, (int, float)) and isinstance(y, (int, float))
-        tools.append({"t_no": str(t["t_no"]).strip().upper(), "name": str(t.get("name") or "").strip(),
+        tools.append({"t_no": str(t["t_no"]).strip().upper(),
                       "x": min(100, max(0, x)) if placed else None,
                       "y": min(100, max(0, y)) if placed else None})
-    config = {"chassis_image": found.get("chassis_image") or "chassis-top.svg", "tools": tools}
+    config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools}
     _template_cache[path] = (mtime, config)
     return config
 
@@ -244,7 +248,7 @@ def build_station(station_id, mapping, torques):
             status = "OK" if row["actual"] >= row["set"] else "NOT OK"
         tools.append({
             "tag": t["t_no"],
-            "label": t["name"] or (row or {}).get("name") or t["t_no"],
+            "label": (row or {}).get("name") or t["t_no"],  # T_Name from SQL
             "x": t["x"], "y": t["y"],
             "set": (row or {}).get("set"),
             "actual": (row or {}).get("actual"),
@@ -335,7 +339,7 @@ _TOOLS_BLOCK = re.compile(r"\{%-?\s*set\s+tools\s*=\s*\[.*?\]\s*-?%\}", re.DOTAL
 def save_positions(station_id, positions, username):
     """Write new x / y (percent) for the station's wrenches into templates/station_<n>.html.
 
-    Only positions change; the wrench list, names and everything else in the file stay as they are.
+    Only positions change; the wrench list and everything else in the file stay as they are.
     """
     name = station_template(station_id)
     if name == "station_generic.html":
@@ -353,7 +357,7 @@ def save_positions(station_id, positions, username):
         if p is not None:
             x, y = (round(min(100.0, max(0.0, float(p[k]))), 1) for k in ("x", "y"))
             x, y = (int(v) if float(v).is_integer() else v for v in (x, y))
-        entry = {"t_no": t["t_no"], "name": t["name"]}
+        entry = {"t_no": t["t_no"]}
         if x is not None:
             entry.update(x=x, y=y)
         lines.append("    " + json.dumps(entry, ensure_ascii=False) + ",")

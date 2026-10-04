@@ -1,5 +1,7 @@
 /* Same look as the Line-3 andon dashboard (navy/gold topbar, green/red tiles). */
 :root {
+  --topbar-h: 66px;
+  --footer-h: 37px;
   --navy: #0b1f3a;
   --navy-light: #142c52;
   --gold: #d8b96a;
@@ -22,7 +24,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--bg);
   color: var(--ink);
-  padding-bottom: 3.25rem; /* leave room for the fixed footer */
+  padding-bottom: var(--footer-h); /* leave room for the fixed footer */
 }
 
 /* ---------- top bar / footer ---------- */
@@ -93,41 +95,60 @@ body {
 .home-button:hover, .nav-button:hover { transform: translateY(-1px); }
 .home-button:hover { background: var(--navy-light); }
 
-/* ---------- overview ---------- */
-.legend {
-  display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center;
-  margin-bottom: 1.25rem; color: #445; font-size: 0.9rem;
+/* ---------- home page: line photo + frosted panel of station buttons ---------- */
+.content:has(.home-hero) { padding: 0; }
+.home-hero {
+  position: relative;
+  height: calc(100vh - var(--topbar-h) - var(--footer-h));
+  background-size: cover;
+  background-position: center 30%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 3% 3.5vh;
 }
-.legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.home-panel {
+  width: 100%;
+  max-width: 1500px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  padding: 1rem 1.5rem 1.4rem;
+}
+.home-panel-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.9rem; }
+.home-legend { display: flex; gap: 1.25rem; font-size: 0.85rem; color: #334; }
+.home-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-.updated { color: #667; font-size: 0.85rem; margin-left: auto; }
-.updated.center { text-align: center; margin: 1.5rem 0 0; }
+.updated { color: #556; font-size: 0.85rem; margin-left: auto; }
+.updated.center { text-align: center; }
 
 .station-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.1rem;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 1rem 1.2rem;
 }
 .station-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  padding: 1.6rem 0.5rem;
-  border-radius: 10px;
+  gap: 0.2rem;
+  padding: 0.7rem 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.35);
   text-decoration: none;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   transition: background-color 0.3s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.station-tile:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22); }
-.tile-name { font-size: 1.2rem; font-weight: 700; }
-.tile-mat { font-family: Consolas, "Courier New", monospace; font-size: 0.85rem; opacity: 0.95; }
-.tile-count { font-size: 0.8rem; background: rgba(0, 0, 0, 0.18); padding: 0.15rem 0.6rem; border-radius: 10px; }
+.station-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3); }
+.tile-name { font-size: 1.45rem; font-weight: 700; }
+.tile-count { font-size: 0.75rem; background: rgba(0, 0, 0, 0.18); padding: 0.05rem 0.55rem; border-radius: 10px; }
 
 .tile-green { background: var(--green); }
 .tile-red { background: var(--red); }
-.tile-idle { background: var(--idle); }
+.tile-idle { background: #1d86a8; }  /* teal like the slide's buttons */
 
 /* ---------- station detail (sized for a desktop screen, no scrolling) ---------- */
 .station-top {

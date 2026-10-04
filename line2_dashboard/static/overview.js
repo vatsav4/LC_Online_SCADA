@@ -18,8 +18,7 @@
         if (!el) return;
         el.classList.remove("tile-green", "tile-red", "tile-idle");
         el.classList.add("tile-" + st.status);
-        el.querySelector(".tile-mat").textContent = st.mat_number || "—";
-        el.querySelector(".tile-count").textContent = st.ok + "/" + st.total + " tools OK";
+        el.querySelector(".tile-count").textContent = st.ok + "/" + st.total + " OK";
       });
       setConnection(data.db_ok, data.updated_at);
     } catch (err) {

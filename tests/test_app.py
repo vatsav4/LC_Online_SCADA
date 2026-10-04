@@ -20,7 +20,7 @@ def test_every_station_template_has_a_valid_tool_list():
 
 def test_station_5_template_lists_its_wrenches():
     tools = line2.station_config(5)["tools"]
-    assert [(t["t_no"], t["x"], t["y"]) for t in tools] == [("T18", 16, 33), ("T23", 78, 67)]
+    assert [(t["t_no"], t["x"], t["y"]) for t in tools] == [("T18", 16, 27), ("T23", 78.2, 73.3)]
 
 
 def test_template_edits_are_picked_up_without_restart(tmp_path, monkeypatch):
@@ -133,12 +133,12 @@ def test_save_positions_needs_login_and_rewrites_template(client, station_copy):
     assert res.status_code == 200, res.get_json()
     text = (station_copy / "station_5.html").read_text()
     assert '{"t_no": "T18", "x": 44.6, "y": 75.9},' in text
-    assert '{"t_no": "T23", "x": 78, "y": 67},' in text   # untouched
+    assert '{"t_no": "T23", "x": 78.2, "y": 73.3},' in text   # untouched
     assert "positions last saved" in text and "by Manager1" in text
     assert "Station 5 - which torque wrenches" in text and 'chassis_image = "IMG_2.jpg"' in text  # rest kept
     assert (station_copy / "station_5.html.bak").exists()
     st5 = client.get("/api/station/5").get_json()
-    assert [(t["tag"], t["x"], t["y"]) for t in st5["tools"]] == [("T18", 44.6, 75.9), ("T23", 78, 67)]
+    assert [(t["tag"], t["x"], t["y"]) for t in st5["tools"]] == [("T18", 44.6, 75.9), ("T23", 78.2, 73.3)]
 
     # saving twice keeps a single "last saved" line
     client.post("/api/station/5/positions", json=body, headers={"X-CSRF-Token": _csrf(client)})

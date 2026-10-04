@@ -15,9 +15,6 @@
     <div class="center-title">{% block center_title %}{% endblock %}</div>
     <div class="right-title">
       {{ line_title }}
-      <span class="conn {{ 'conn-ok' if db_ok else 'conn-down' }}" id="conn">
-        <span class="conn-dot"></span><span id="conn-text">{{ 'Online' if db_ok else 'Offline' }}</span>
-      </span>
       {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
       {% if user %}
       <form method="post" action="{{ url_for('logout') }}" class="logout-form">
@@ -36,7 +33,12 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="footer-bar">&copy; TMCVL Dharwad - Maintenance Team</footer>
+  <footer class="footer-bar">
+    <span>&copy; TMCVL Dharwad - Maintenance Team</span>
+    <span class="conn {{ 'conn-ok' if db_ok else 'conn-down' }}" id="conn">
+      <span class="conn-dot"></span><span id="conn-text">{{ 'Online' if db_ok else 'Offline' }}</span>
+    </span>
+  </footer>
 
   {% block scripts %}{% endblock %}
 

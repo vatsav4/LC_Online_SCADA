@@ -40,6 +40,20 @@
     </span>
   </footer>
 
+  <script>
+    // Use the real top bar / footer heights (they differ with screen scaling and fonts).
+    (function () {
+      function measureBars() {
+        const root = document.documentElement.style;
+        root.setProperty("--topbar-h", document.querySelector(".topbar").offsetHeight + "px");
+        root.setProperty("--footer-h", document.querySelector(".footer-bar").offsetHeight + "px");
+      }
+      measureBars();
+      window.addEventListener("resize", measureBars);
+      window.addEventListener("load", measureBars);
+    })();
+  </script>
+
   {% block scripts %}{% endblock %}
 
   <!-- spa.js swaps .content / titles on navigation instead of a full reload. -->

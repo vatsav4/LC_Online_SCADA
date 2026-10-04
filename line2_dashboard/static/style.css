@@ -105,13 +105,19 @@ body {
 
 /* ---------- home page: line photo + station panel on the right ---------- */
 .content:has(.home-hero) { padding: 0; }
+/* The photo is pinned to the window: from under the top bar to the very bottom (behind the
+   footer), so no gap can appear whatever the real bar heights are on a given PC. */
 .home-hero {
-  height: calc(100vh - var(--topbar-h) - var(--footer-h));
+  position: fixed;
+  left: 0; right: 0;
+  top: var(--topbar-h);
+  bottom: 0;
+  z-index: 0;
   background-size: cover;
   background-position: center 30%;
   display: flex;
   justify-content: flex-end;  /* panel on the right: keeps the station signboards on the left visible */
-  padding: 2.5vh 2.5%;
+  padding: 2.5vh 2.5% calc(var(--footer-h) + 2.5vh);
 }
 .home-panel {
   width: clamp(360px, 23vw, 460px);

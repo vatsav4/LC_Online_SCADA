@@ -1,25 +1,8 @@
 {% extends "station_base.html" %}
-{#
-  Station 9 - which torque wrenches are shown on this station's page.
 
-  chassis_image  picture from static/chassis/ for this station's stage of the chassis:
-                   IMG_1.jpg  bare frame (top view)
-                   IMG_2.jpg  axles fitted (top view)
-                   IMG_3.jpg  engine + driveline (top view)
-                   IMG_4.jpg  side view, cab frame
-                   IMG_5.jpg  side view, complete with wheels
-                 (add more pictures to static/chassis/ and use their file name here)
-
-  tools          one line per wrench:  {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33},
-                   t_no  wrench number as in Torques_Actual_Data (T18 = WinCC SA_T18).
-                   name  text shown on the box (type it here; "" shows just the T number).
-                   x, y  circle position in % from the left / top of the picture.
-                         Set by a line manager: Manager login -> Edit positions -> drag -> Save.
-                         For a new wrench just write {"t_no": "T5", "name": "..."}; it appears below the
-                         picture until a manager places it.
-
-  Saving this file is enough - refresh the browser, no restart needed.
-#}
 {% set chassis_image = "IMG_3.jpg" %}
 {% set tools = [
+    {"t_no": "T17", "name": "Engine Mounting", "x": 16, "y": 80.7},
+    {"t_no": "T19", "name": "Front/Rear Axle Brake Hose Tightening", "x": 83, "y": 25.6},
+    <!-- {"t_no": "T22", "name": "Conductive Grease Application", "x": 83, "y": 25.6}, -->
 ] %}

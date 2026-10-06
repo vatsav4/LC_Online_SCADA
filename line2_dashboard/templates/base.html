@@ -13,8 +13,8 @@
            onerror="this.style.display='none'">
     </a>
     <div class="center-title">{% block center_title %}{% endblock %}</div>
-    <div class="right-title">
-      {{ line_title }}
+    <!-- <div class="right-title">
+      {{ line_title }} -->
       {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
       {% if user %}
       <form method="post" action="{{ url_for('logout') }}" class="logout-form">

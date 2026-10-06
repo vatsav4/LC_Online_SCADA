@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}All Stations{% endblock %}
-{% block center_title %}All Stations{% endblock %}
+{% block center_title %}LCV & ICV Assembly Line - L3 & S3 Controls Dashboard{% endblock %}
 
 {% block content %}
 <!-- Home page: the line photo (static/Background.jpg) with the station panel on the right. -->
@@ -21,7 +21,7 @@
       {% for st in stations %}
       <a class="station-tile tile-{{ st.status }}" id="station-tile-{{ st.id }}"
          href="{{ url_for('station', station_id=st.id) }}" title="Station {{ st.id }}">
-        <span class="tile-name">St{{ st.id }}</span>
+        <span class="tile-name">STN - {{ st.id }}</span>
         <span class="tile-count">{{ st.ok }}/{{ st.total }} OK</span>
       </a>
       {% endfor %}

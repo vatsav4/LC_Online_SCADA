@@ -4,7 +4,8 @@
 #}
 {% extends "base.html" %}
 {% block title %}Station {{ station_id }}{% endblock %}
-{% block center_title %}Station - {{ station_id }}{% endblock %}
+{% block center_title %}Station - {{ station_id }}
+<span class="status-ribbon ribbon-idle" id="status-ribbon"></span>{% endblock %}
 
 {% block content %}
 <div class="station-top">
@@ -54,31 +55,20 @@
   refreshed from /api/station/<id> every 2 s): callout boxes above / below the chassis,
   a circle on each torque point and the leader lines between them.
 -->
-<div class="station-body">
 <section class="station-view" id="station-view">
-  <div class="status-ribbon ribbon-idle" id="status-ribbon"></div>
   <div class="callouts callouts-top" id="callouts-top"></div>
+  {% if st.s3 %}<div class="s3-layer s3-layer-top" id="s3-top"></div>{% endif %}
   <div class="chassis-box" id="chassis-box">
     <img id="chassis-img" alt="Chassis" draggable="false"
          src="{{ url_for('static', filename='chassis/' ~ st.image) }}">
     <div class="markers" id="markers"></div>
   </div>
   <div class="callouts callouts-bottom" id="callouts-bottom"></div>
+  {% if st.s3 %}<div class="s3-layer s3-layer-bottom" id="s3-bottom"></div>
+  <svg class="s3-rays" id="s3-rays" aria-hidden="true"></svg>{% endif %}
   <svg class="leaders" id="leaders" aria-hidden="true"></svg>
   <span class="updated" id="updated-at">{{ 'Updated ' ~ updated_at if updated_at else '' }}</span>
 </section>
-
-{% if st.s3 %}
-<!-- S3 controls of this station (s3_controls in the station template), drawn by s3.js -->
-<aside class="s3-panel">
-  <div class="s3-head">
-    <span class="s3-title">S3 Controls</span>
-    <span class="s3-summary" id="s3-summary"></span>
-  </div>
-  <div class="s3-list"><div class="s3-cards" id="s3-list"></div></div>
-</aside>
-{% endif %}
-</div>
 
 <section class="unplaced" id="unplaced-section" hidden>
   <h3 class="unplaced-title">No position yet{% if user %} - click Edit positions to place them{% endif %}</h3>

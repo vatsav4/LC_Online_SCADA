@@ -1,130 +1,121 @@
-// S3 controls panel on a station page: one card per control with a drawing of it
-//   light_curtain  safety light curtain; NOT OK = a hand breaks the beams
-//   over_travel    overhead roller limit switch; NOT OK = carriage past the limit, lever tripped
-//   sensor         any other S3 signal (shield with tick / cross)
-// Green = OK (tag 0), red = NOT OK (tag 1), grey = no data yet.
-// station.js calls window.renderS3(st.s3) on every refresh. A card is only redrawn when its
-// status changes, so the beam animation keeps running smoothly.
+// S3 controls drawn around the chassis on a station page (s3_controls in the station template):
+//   light_curtain  a bar above ("place": "top") or below ("bottom") the chassis; its beams shine onto
+//                  the chassis - faint green when OK, bright red and flashing when NOT OK
+//   over_travel    roller limit switch at the right-hand end of its row; red light bursts out of it
+//                  and the lever is tripped when NOT OK
+//   sensor         any other S3 signal: a beacon lamp
+// Tag 0 = OK (green), 1 = NOT OK (red), no row in SQL yet = grey.
+// station.js calls window.renderS3(st.s3) on every refresh and window.drawS3Rays() whenever the
+// layout changes. A device is only redrawn when its status changes, so animations run smoothly.
 (function () {
+  const $ = id => document.getElementById(id);
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const cls = s => (s === "OK" ? "ok" : s === "NOT OK" ? "bad" : "pending");
   const LABEL = { ok: "OK", bad: "NOT OK", pending: "NO DATA" };
+  const STUDS = 16;
+  const since = (c, s) => (c.since && s !== "pending" ? "since " + c.since : "");
 
-  // ---------------------------------------------------------------- drawings (viewBox 200 x 140)
-  function post(x, lensX) {
-    return `<rect x="${x}" y="8" width="16" height="124" rx="3" class="housing"/>
-      <rect x="${lensX}" y="18" width="5" height="104" class="lens"/>
-      <rect x="${x}" y="8" width="16" height="9" rx="3" class="cap"/>
-      <rect x="${x}" y="123" width="16" height="9" rx="3" class="cap"/>
-      <circle cx="${x + 8}" cy="12.5" r="2.6" class="led"/>`;
+  function tag(c, s) {
+    return `<div class="s3-tag"><b>${esc(c.name)}</b><span class="s3-state">${LABEL[s]}</span>` +
+           `<span class="s3-since">${esc(since(c, s))}</span></div>`;
   }
 
-  const HAND = `<g class="hand">
-      <rect x="97" y="-4" width="24" height="40" rx="3" class="sleeve"/>
-      <rect x="93" y="56" width="6.5" height="24" rx="3.2" class="skin"/>
-      <rect x="100.5" y="58" width="6.5" height="28" rx="3.2" class="skin"/>
-      <rect x="108" y="58" width="6.5" height="27" rx="3.2" class="skin"/>
-      <rect x="115.5" y="56" width="6.5" height="22" rx="3.2" class="skin"/>
-      <rect x="83" y="40" width="7" height="22" rx="3.5" class="skin" transform="rotate(-28 87 51)"/>
-      <rect x="92" y="35" width="32" height="28" rx="9" class="skin"/>
-      <rect x="95" y="30" width="28" height="7" rx="2" class="cuff"/>
-    </g>`;
-
-  function lightCurtain(state) {
-    const beams = [];
-    for (let i = 0; i < 13; i++) {
-      const y = 22 + i * 8;
-      if (state === "bad" && y <= 86) {   // beam stopped by the hand: lit up to it, dark after it
-        beams.push(`<line class="beam" x1="38" y1="${y}" x2="88" y2="${y}"/>`,
-                   `<line class="beam beam-dead" x1="126" y1="${y}" x2="162" y2="${y}"/>`);
-      } else {
-        beams.push(`<line class="beam" x1="38" y1="${y}" x2="162" y2="${y}"/>`);
-      }
-    }
-    return `<svg viewBox="0 0 200 140" role="img" aria-label="Light curtain">
-      <rect x="38" y="18" width="124" height="104" class="field"/>
-      ${beams.join("")}
-      ${post(22, 33)}${post(162, 162)}
-      ${state === "bad" ? HAND : ""}
-    </svg>`;
+  function curtain(c, s) {
+    return `${tag(c, s)}
+      <div class="lc-bar"><i class="lc-cap"></i><span class="lc-body"><span class="lc-led"></span></span><i class="lc-cap"></i></div>
+      <div class="lc-studs">${"<i></i>".repeat(STUDS)}</div>`;
   }
 
-  function overTravel(state) {
-    const x = state === "bad" ? 104 : 20;          // carriage position on the rail
-    const lever = state === "bad" ? -50 : 0;       // roller lever pushed over by the cam
-    return `<svg viewBox="0 0 200 140" role="img" aria-label="Over-travel limit switch">
-      <rect x="6" y="4" width="188" height="9" rx="2" class="steel"/>
-      <rect x="146" y="13" width="4" height="6" class="steel"/>
-      <rect x="134" y="18" width="30" height="28" rx="3" class="housing"/>
-      <rect x="138" y="30" width="16" height="11" rx="2" class="lens"/>
-      <circle cx="158" cy="25" r="2.8" class="led"/>
-      <g transform="rotate(${lever} 148 46)">
-        <line x1="148" y1="46" x2="148" y2="64" class="arm"/>
-        <circle cx="148" cy="66" r="6" class="roller"/>
-      </g>
-      <circle cx="148" cy="46" r="2.6" class="pivot"/>
-      <line x1="178" y1="54" x2="178" y2="128" class="limit-line"/>
-      <g class="carriage">
-        <polygon points="${x + 38},76 ${x + 44},64 ${x + 58},64 ${x + 62},76" class="cam"/>
-        <rect x="${x}" y="76" width="64" height="24" rx="4" class="body"/>
-        <rect x="${x + 6}" y="82" width="22" height="8" rx="2" class="window"/>
-        <circle cx="${x + 13}" cy="104" r="6" class="wheel"/>
-        <circle cx="${x + 51}" cy="104" r="6" class="wheel"/>
-      </g>
-      <rect x="6" y="110" width="188" height="7" rx="2" class="steel"/>
-      <rect x="6" y="122" width="132" height="5" rx="2" class="zone-ok"/>
-      <rect x="138" y="122" width="56" height="5" rx="2" class="zone-bad"/>
-      ${state === "bad" ? `<g class="warn"><polygon points="30,24 46,52 14,52"/><text x="30" y="49">!</text></g>` : ""}
-    </svg>`;
+  function limitSwitch(c, s) {
+    const lever = s === "bad" ? 38 : 0;
+    // red light bursting out of the switch in every direction except up into the mounting
+    const burst = s === "bad" ? [-10, 15, 40, 65, 90, 115, 140, 165, 190].map(deg => {
+      const a = deg * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);
+      return `<line x1="${(35 + 30 * c).toFixed(1)}" y1="${(40 + 30 * n).toFixed(1)}" x2="${(35 + 52 * c).toFixed(1)}" y2="${(40 + 52 * n).toFixed(1)}"/>`;
+    }).join("") : "";
+    return `${tag(c, s)}
+      <svg class="ls" viewBox="0 0 70 100" role="img" aria-label="Over-travel limit switch">
+        ${burst ? `<g class="ls-burst">${burst}</g>` : ""}
+        <rect x="0" y="0" width="70" height="6" class="ls-mount"/>
+        <rect x="32" y="6" width="6" height="8" class="ls-mount"/>
+        <rect x="13" y="14" width="44" height="36" rx="5" class="ls-body"/>
+        <rect x="20" y="25" width="20" height="14" rx="2" class="ls-window"/>
+        <circle cx="48" cy="22" r="4.5" class="ls-led"/>
+        <g transform="rotate(${lever} 35 50)">
+          <line x1="35" y1="50" x2="35" y2="80" class="ls-arm"/>
+          <circle cx="35" cy="86" r="8" class="ls-roller"/>
+        </g>
+        <circle cx="35" cy="50" r="3" class="ls-pivot"/>
+      </svg>`;
   }
 
-  function sensor(state) {
-    const mark = state === "ok" ? `<polyline points="80,72 95,88 122,56" class="mark"/>`
-      : state === "bad" ? `<path d="M82,56 L118,92 M118,56 L82,92" class="mark"/>` : `<circle cx="100" cy="74" r="4" class="mark-dot"/>`;
-    return `<svg viewBox="0 0 200 140" role="img" aria-label="Safety signal">
-      <path d="M100,12 L146,30 V70 C146,100 124,120 100,130 C76,120 54,100 54,70 V30 Z" class="shield"/>
-      ${mark}
-    </svg>`;
+  function beacon(c, s) {
+    return `${tag(c, s)}<span class="beacon"><i></i></span>`;
   }
 
-  const PICTURES = { light_curtain: lightCurtain, over_travel: overTravel, sensor: sensor };
+  const KIND = { light_curtain: ["s3-curtain", curtain], over_travel: ["s3-switch", limitSwitch], sensor: ["s3-beacon", beacon] };
 
-  // ---------------------------------------------------------------- cards
-  const since = (c, s) => (c.since ? (s === "bad" ? "since " : s === "ok" ? "OK since " : "") + c.since : "");
-
-  function card(c) {
+  function device(c) {
     const s = cls(c.status);
-    return `<div class="s3-card s3-${s}" data-s3="${esc(c.tag)}" data-status="${s}" title="${esc(c.tag)}">
-      <div class="s3-pic">${(PICTURES[c.picture] || sensor)(s)}</div>
-      <div class="s3-info">
-        <div class="s3-name">${esc(c.name)}</div>
-        <span class="s3-state">${LABEL[s]}</span>
-        <div class="s3-since">${esc(since(c, s))}</div>
-      </div>
-    </div>`;
+    const [kind, draw] = KIND[c.picture] || KIND.sensor;
+    return `<div class="s3-dev ${kind} s3-${s}" data-s3="${esc(c.tag)}" data-status="${s}" title="${esc(c.tag)}">${draw(c, s)}</div>`;
+  }
+
+  function fill(layer, controls) {
+    if (!layer) return;
+    const tags = controls.map(c => c.tag).join("|");
+    if (layer.getAttribute("data-tags") !== tags) {           // first draw / list changed
+      layer.setAttribute("data-tags", tags);
+      layer.innerHTML = controls.map(device).join("");
+      return;
+    }
+    controls.forEach((c, i) => {
+      const el = layer.children[i], s = cls(c.status);
+      if (el.getAttribute("data-status") !== s) el.outerHTML = device(c);
+      else el.querySelector(".s3-since").textContent = since(c, s);
+    });
   }
 
   window.renderS3 = function (controls) {
-    const list = document.getElementById("s3-list");
-    if (!list || !controls) return;
-    const tags = controls.map(c => c.tag).join("|");
-    if (list.getAttribute("data-tags") !== tags) {           // first draw / list changed
-      list.setAttribute("data-tags", tags);
-      list.innerHTML = controls.map(card).join("");
-    } else {
-      controls.forEach((c, i) => {
-        const el = list.children[i];
-        if (el.getAttribute("data-status") !== cls(c.status)) el.outerHTML = card(c);
-        else el.querySelector(".s3-since").textContent = since(c, cls(c.status));
+    if (!controls || !controls.length) return;
+    fill($("s3-top"), controls.filter(c => c.place !== "bottom"));
+    fill($("s3-bottom"), controls.filter(c => c.place === "bottom"));
+    window.drawS3Rays();
+  };
+
+  // Light-curtain beams: from each stud of the bar onto the chassis picture.
+  let lastRays = "";
+  window.drawS3Rays = function () {
+    const svg = $("s3-rays"), view = $("station-view"), img = $("chassis-img");
+    if (!svg || !view || !img) return;
+    const vr = view.getBoundingClientRect(), ir = img.getBoundingClientRect();
+    const parts = [];
+    view.querySelectorAll(".s3-curtain").forEach(dev => {
+      const s = dev.getAttribute("data-status");
+      if (s === "pending") return;
+      const top = dev.parentElement.id === "s3-top";
+      const reach = s === "bad" ? 0.42 : 0.1;                  // how far into the picture the light goes
+      const yEnd = top ? ir.top + ir.height * reach : ir.bottom - ir.height * reach;
+      const studs = [...dev.querySelectorAll(".lc-studs i")].map(i => i.getBoundingClientRect());
+      if (!studs.length) return;
+      const y0 = top ? studs[0].bottom : studs[0].top;
+      const x0 = studs[0].left, x1 = studs[studs.length - 1].right;
+      const p = n => Math.round(n * 10) / 10;
+      parts.push(`<polygon class="sheet" fill="url(#s3-${top ? "down" : "up"}-${s})" points="${p(x0 - vr.left)},${p(y0 - vr.top)} ` +
+                 `${p(x1 - vr.left)},${p(y0 - vr.top)} ${p(x1 - vr.left + 14)},${p(yEnd - vr.top)} ${p(x0 - vr.left - 14)},${p(yEnd - vr.top)}"/>`);
+      studs.forEach(r => {
+        const x = p(r.left + r.width / 2 - vr.left);
+        parts.push(`<line class="ray ray-${s}" x1="${x}" y1="${p(y0 - vr.top)}" x2="${x}" y2="${p(yEnd - vr.top)}"/>`);
       });
-    }
-    const bad = controls.filter(c => c.status === "NOT OK").length;
-    const waiting = controls.filter(c => c.status === "PENDING").length;
-    const sum = document.getElementById("s3-summary");
-    if (sum) {
-      sum.className = "s3-summary " + (bad ? "s3-sum-bad" : waiting ? "s3-sum-pending" : "s3-sum-ok");
-      sum.textContent = bad ? `${bad} NOT OK` : waiting ? "NO DATA" : "ALL OK";
-    }
+    });
+    // light fades out away from the bar
+    const grad = (id, color, down) => `<linearGradient id="${id}" x1="0" y1="${down ? 0 : 1}" x2="0" y2="${down ? 1 : 0}">` +
+      `<stop offset="0" stop-color="${color}" stop-opacity="0.45"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient>`;
+    const markup = `<defs>${grad("s3-down-bad", "#ff2b2b", true)}${grad("s3-up-bad", "#ff2b2b", false)}` +
+      `${grad("s3-down-ok", "#2fb350", true)}${grad("s3-up-ok", "#2fb350", false)}</defs>${parts.join("")}`;
+    svg.setAttribute("width", vr.width);
+    svg.setAttribute("height", vr.height);
+    if (markup !== lastRays) { svg.innerHTML = markup; lastRays = markup; }  // unchanged: keep animations running
   };
 })();

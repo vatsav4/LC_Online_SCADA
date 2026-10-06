@@ -288,8 +288,10 @@ def station_config(station_id):
         if not tag:
             logger.error(f"{name}: every S3 control needs a tag, skipped {c!r}")
             continue
+        place = c.get("place") if c.get("place") in ("top", "bottom") else (
+            "bottom" if tag.upper().endswith(("_RH", "RH")) else "top")   # RH side drawn below the chassis
         s3_controls.append({"tag": tag.upper(), "name": str(c.get("name") or "").strip() or tag.replace("_", " "),
-                            "picture": _s3_picture(tag, c.get("picture"))})
+                            "picture": _s3_picture(tag, c.get("picture")), "place": place})
     config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools,
               "s3_controls": s3_controls, "error": None}
     _template_cache[path] = (mtime, config)

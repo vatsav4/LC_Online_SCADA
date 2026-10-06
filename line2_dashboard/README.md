@@ -15,7 +15,7 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 |---|---|---|
 | `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | existing WinCC script `VB_S` | VC and MAT plates |
 | `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
-| `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 Controls panel (Station 7) |
+| `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
 table yet. Bypassed wrenches get a BYPASS badge and an amber rim on the circle.
@@ -89,8 +89,15 @@ Add an `s3_controls` list to the station's template (see `station_7.html`):
 - **`tag`:** the WinCC tag name, as logged in `S3_Controls_Data.Tag_Name` (also add it to the `CONTROLS` list in
   `wincc/S3_Controls_To_SQL_Action.vbs`).
 - **`picture`** (optional): `"light_curtain"`, `"over_travel"` or `"sensor"`. Left out, it's chosen from the tag name.
+- **`place`** (optional): `"top"` (above the chassis) or `"bottom"` (below). Left out, tags ending in `RH` go below.
 
-The controls show in a panel to the right of the chassis.
+The devices are drawn in the rows above and below the chassis: a light curtain as a bar whose beams shine onto the
+chassis (faint green when OK, flashing red when NOT OK), the over-travel limit switch at the right-hand end of its row
+(red light bursts out of it and the lever is tripped when NOT OK). Because they use those rows, a station with S3
+devices shouldn't also have torque wrenches there.
+
+Every station's chassis is drawn at the same height: the height at which the widest picture (`IMG_1.jpg`, set as
+`--widest-aspect` in `static/style.css`) fills the panel width. If you add a wider picture, update that number.
 
 ## Line managers: moving the circles
 

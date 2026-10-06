@@ -33,7 +33,7 @@ STATION_7 = """{% extends "station_base.html" %}
 {% set s3_controls = [
     {"tag": "Inversion_Light_Curtain_LH", "name": "Light Curtain LH"},
     {"tag": "Inversion_Over_Travel"},
-    {"tag": "Door_Switch", "name": "Door", "picture": "sensor"},
+    {"tag": "Door_Switch_RH", "name": "Door", "picture": "sensor"},
 ] %}
 """
 
@@ -56,9 +56,9 @@ def test_station_template_lists_its_wrenches_and_s3_controls(known_templates):
     assert [(t["t_no"], t["x"], t["y"]) for t in tools] == [("T18", 16, 27), ("T23", 78.2, 73.3)]
     s3 = line2.station_config(7)["s3_controls"]
     assert s3 == [
-        {"tag": "INVERSION_LIGHT_CURTAIN_LH", "name": "Light Curtain LH", "picture": "light_curtain"},
-        {"tag": "INVERSION_OVER_TRAVEL", "name": "Inversion Over Travel", "picture": "over_travel"},
-        {"tag": "DOOR_SWITCH", "name": "Door", "picture": "sensor"},
+        {"tag": "INVERSION_LIGHT_CURTAIN_LH", "name": "Light Curtain LH", "picture": "light_curtain", "place": "top"},
+        {"tag": "INVERSION_OVER_TRAVEL", "name": "Inversion Over Travel", "picture": "over_travel", "place": "top"},
+        {"tag": "DOOR_SWITCH_RH", "name": "Door", "picture": "sensor", "place": "bottom"},
     ]
 
 
@@ -105,7 +105,7 @@ def test_s3_status_1_is_not_ok(known_templates):
     assert [c["status"] for c in st["s3"]] == ["NOT OK", "OK", "PENDING"] and st["status"] == "red"
     assert st["s3"][0]["since"].count(":") == 2
     s3["INVERSION_LIGHT_CURTAIN_LH"]["value"] = 0
-    s3["DOOR_SWITCH"] = {"value": 0, "changed": None}
+    s3["DOOR_SWITCH_RH"] = {"value": 0, "changed": None}
     assert line2.build_station(7, {}, {}, s3)["status"] == "green"
     summary = line2._summary([line2.build_station(7, {}, {}, s3)])[0]
     assert (summary["ok"], summary["total"]) == (3, 3)
@@ -157,7 +157,7 @@ def test_pages_and_api(client):
     page = client.get("/station/5").get_data(as_text=True)
     assert "MAT513357TFJ12784" in page and "chassis/IMG_2.jpg" in page and "Manager login" in page and "edit-toggle" not in page
     st7 = client.get("/api/station/7").get_json()
-    assert len(st7["s3"]) == 3 and "s3-panel" in client.get("/station/7").get_data(as_text=True)
+    assert len(st7["s3"]) == 3 and "s3-rays" in client.get("/station/7").get_data(as_text=True)
     assert client.get("/station/18").status_code == 404
     home = client.get("/").get_data(as_text=True)
     assert "Background.jpg" in home and ">STN - 17<" in home

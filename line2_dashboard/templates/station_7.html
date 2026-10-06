@@ -5,12 +5,16 @@
 ] %}
 
 {#
-  S3 controls shown in the panel on the right (logged by wincc/S3_Controls_To_SQL_Action.vbs).
+  S3 controls drawn around the chassis (logged by wincc/S3_Controls_To_SQL_Action.vbs).
     tag      WinCC tag name, as in dbo.S3_Controls_Data.Tag_Name
-    name     text shown on the card
+    name     text shown on the label
     picture  optional: "light_curtain", "over_travel" or "sensor"
              (left out = chosen from the tag name)
-  Status 1 = NOT OK (red), 0 = OK (green).
+    place    optional: "top" (above the chassis) or "bottom" (below it)
+             (left out = tags ending in RH go below, the rest above)
+  Status 1 = NOT OK (red light), 0 = OK (green).
+  The S3 devices use the rows above / below the chassis, so a station with S3 devices
+  should not also have torque wrenches in those rows.
 #}
 {% set s3_controls = [
     {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Light Curtain LH"},

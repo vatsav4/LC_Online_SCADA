@@ -2,9 +2,10 @@
 :root {
   /* every station reserves one row of up to 3 boxes above and one below the chassis
      (6 wrenches max), so the chassis is the same size on every station */
-  --box-h: 6.6rem;
-  /* screen height used by everything on a station page except the chassis picture */
-  --chassis-reserve: 330px;  /* upper limit only - station.js shrinks it until nothing scrolls */
+  --box-h: 6rem;
+  /* width / height of the widest picture in static/chassis (IMG_1.jpg): station.js sizes every
+     station's chassis so this one fits, which keeps the chassis the same size on every station */
+  --widest-aspect: 3.72;
   --topbar-h: 66px;
   --footer-h: 37px;
   --navy: #0b1f3a;
@@ -76,7 +77,7 @@ body {
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.content { width: 100%; padding: 2rem clamp(1.25rem, 4vw, 4rem); }
+.content { width: 100%; padding: 2rem clamp(0.75rem, 1.5vw, 2rem); }
 
 @keyframes blink-box {
   0%, 100% { opacity: 1; }
@@ -190,7 +191,7 @@ body {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.5rem;
 }
 .station-top .station-nav { justify-self: end; }
 .station-nav { display: flex; gap: 0.5rem; }
@@ -202,33 +203,31 @@ body {
   background: linear-gradient(180deg, #232a33, #111519);
   color: #f4f6f8;
   border-radius: 6px;
-  padding: 0.35rem 2rem 0.5rem;
+  padding: 0.2rem 2rem 0.3rem;
   min-width: 240px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(216, 185, 106, 0.35);
 }
 .plate-wide { min-width: 330px; }
 .plate-label { color: var(--gold); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.15em; }
-.plate-value { font-size: 1.6rem; font-weight: 600; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.plate-value { font-size: 1.4rem; font-weight: 600; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
 
 /* chassis view: callouts above, chassis with circles, callouts below, leader lines on top */
-.content { padding-top: 1rem; padding-bottom: 0.5rem; }
+.content { padding-top: 0.6rem; padding-bottom: 0.4rem; }
 .station-view {
   position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 2.4rem 1.5rem 1.4rem;
+  padding: 0.9rem 1rem 1.1rem;
   margin: 0 auto;
-  max-width: 1800px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
 }
+/* station status, next to the station name in the top bar */
 .status-ribbon {
-  position: absolute;
-  top: 0.6rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  padding: 0.25rem 1.1rem;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 1rem;
+  padding: 0.2rem 1rem;
   border-radius: 20px;
   font-size: 0.78rem;
   font-weight: 700;
@@ -258,7 +257,7 @@ body {
   position: relative;
   width: fit-content;
   max-width: 100%;
-  margin: 1.1rem auto;
+  margin: 0.7rem auto;
   z-index: 1;
 }
 /* The pictures are trimmed to the chassis, so let it grow: as wide as the panel allows,
@@ -268,20 +267,21 @@ body {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: max(120px, calc(100vh - var(--chassis-reserve)));
   user-select: none;
   mix-blend-mode: multiply;  /* the pictures' off-white background melts into the white panel */
 }
 
 /* short desktop screens (e.g. 1366x768): more compact boxes leave more room for the chassis */
 @media (max-height: 760px) {
-  :root { --box-h: 5.9rem; }
-  .station-top { margin-bottom: 0.5rem; }
-  .plate { padding: 0.2rem 1.5rem 0.3rem; }
-  .plate-value { font-size: 1.3rem; }
-  .station-view { padding-top: 2.1rem; padding-bottom: 1.2rem; }
-  .chassis-box { margin: 0.7rem auto; }
-  .tool-box { padding: 0.35rem 0.8rem 0.4rem; width: 250px; }
+  :root { --box-h: 5.75rem; }
+  .tool-title { margin-bottom: 0.15rem; }
+  .station-top { margin-bottom: 0.35rem; }
+  .plate { padding: 0.1rem 1.5rem 0.2rem; }
+  .plate-value { font-size: 1.15rem; }
+  .home-button, .nav-button { padding: 0.4rem 1rem; }
+  .station-view { padding-top: 0.7rem; padding-bottom: 1rem; }
+  .chassis-box { margin: 0.5rem auto; }
+  .tool-box { padding: 0.3rem 0.8rem 0.35rem; width: 250px; }
   .tool-title { font-size: 0.95rem; }
   .tool-row { font-size: 0.95rem; }
   .bar { margin-top: 0.25rem; }
@@ -353,7 +353,7 @@ body {
   flex-direction: column;
   justify-content: center;
   border-radius: 12px;
-  padding: 0.55rem 1rem 0.6rem;
+  padding: 0.4rem 1rem 0.45rem;
   color: var(--ink);
   border: 2px solid rgba(0, 0, 0, 0.35);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -376,14 +376,14 @@ body {
 }
 .chip-bypass { background: var(--amber); color: var(--ink); }
 .tool-title { margin-bottom: 0.3rem; }
-.tool-row { display: grid; grid-template-columns: 1fr auto; font-size: 1.05rem; padding: 0 0.2rem; }
+.tool-row { display: grid; grid-template-columns: 1fr auto; font-size: 1rem; line-height: 1.3; padding: 0 0.2rem; }
 .tool-row b { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
 .bar { height: 5px; margin-top: 0.4rem; background: rgba(0, 0, 0, 0.18); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: rgba(255, 255, 255, 0.85); transition: width 0.3s ease; }
 
-.unplaced { max-width: 1800px; margin: 0.8rem auto 0; }
+.unplaced { margin: 0.8rem auto 0; }
 .unplaced-title { text-align: center; color: #556; font-size: 0.95rem; margin: 0 0 0.5rem; }
-.station-view .updated { position: absolute; right: 1rem; bottom: 0.35rem; font-size: 0.72rem; color: #889; }
+.station-view .updated { position: absolute; right: 1rem; bottom: 0.2rem; font-size: 0.72rem; color: #889; }
 
 /* manager edit bar */
 .edit-bar {
@@ -439,92 +439,89 @@ button.home-button { border: 0; }
 }
 .template-error code { background: #fff; padding: 0.1rem 0.4rem; border-radius: 4px; }
 
-/* ---------- S3 controls panel (stations whose template sets s3_controls) ---------- */
-.station-body { display: flex; gap: 1rem; align-items: stretch; max-width: 1800px; margin: 0 auto; }
-.station-body .station-view { flex: 1; min-width: 0; margin: 0; }
-.s3-panel {
-  width: clamp(300px, 20vw, 380px);
-  flex: none;
+/* ---------- S3 controls drawn around the chassis (static/s3.js) ---------- */
+/* each layer lies over the reserved row above / below the chassis */
+.s3-layer {
+  position: relative;
+  z-index: 3;
+  height: var(--box-h);
+  margin-top: calc(-1 * var(--box-h));
   display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+  justify-content: center;
+  pointer-events: none;
 }
-.s3-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.45rem 0.9rem;
-  background: linear-gradient(180deg, var(--navy-light), var(--navy));
-  color: var(--gold);
-}
-.s3-title { font-size: 0.85rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
-.s3-summary { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; color: #fff; padding: 0.1rem 0.65rem; border-radius: 10px; }
-.s3-sum-ok { background: var(--green); }
-.s3-sum-bad { background: var(--red); animation: blink-box 1.4s infinite; }
-.s3-sum-pending { background: var(--idle); }
-/* the cards share the panel height, which follows the chassis view (never makes the page taller) */
-.s3-list { flex: 1; position: relative; }
-.s3-cards { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.6rem; }
+.s3-layer-top { align-items: flex-end; }
+.s3-layer-bottom { align-items: flex-start; }
+.s3-dev { --s3c: var(--idle); pointer-events: auto; }
+.s3-ok { --s3c: var(--green); }
+.s3-bad { --s3c: var(--red); }
 
-.s3-card {
-  --s3c: var(--idle);
-  flex: 1 1 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 52% 1fr;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 0.6rem;
-  align-items: center;
-  padding: 0.35rem 0.7rem 0.35rem 0.35rem;
-  border-radius: 10px;
-  border: 2px solid var(--s3c);
-  background: #f0f2f5;
+.s3-tag {
+  display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+  font-size: 0.85rem; padding: 0.12rem 0.25rem 0.12rem 0.7rem; border-radius: 14px;
+  background: #fff; border: 2px solid var(--s3c); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
-.s3-ok { --s3c: var(--green); background: #eaf7ee; }
-.s3-bad { --s3c: var(--red); background: #fdecec; animation: s3-alarm 1.4s ease-in-out infinite; }
-@keyframes s3-alarm {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 59, 59, 0.55); }
-  50% { box-shadow: 0 0 0 6px rgba(224, 59, 59, 0); }
-}
-.s3-pic { height: 100%; min-height: 0; }
-.s3-pic svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.s3-info { min-width: 0; }
-.s3-name { font-size: 0.98rem; font-weight: 800; line-height: 1.2; }
-.s3-state {
-  display: inline-block; margin-top: 0.35rem; padding: 0.12rem 0.75rem; border-radius: 12px;
-  background: var(--s3c); color: #fff; font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em;
-}
-.s3-since { margin-top: 0.25rem; font-size: 0.75rem; color: #556; font-variant-numeric: tabular-nums; }
+.s3-tag b { text-transform: uppercase; letter-spacing: 0.04em; }
+.s3-state { background: var(--s3c); color: #fff; font-weight: 800; padding: 0.05rem 0.65rem; border-radius: 10px; letter-spacing: 0.05em; }
+.s3-bad .s3-state { animation: blink-box 1s infinite; }
+.s3-since { color: #556; font-size: 0.75rem; font-variant-numeric: tabular-nums; padding-right: 0.35rem; }
+.s3-since:empty { display: none; }
 
-/* drawings (static/s3.js) */
-.s3-pic .housing { fill: #f5c400; stroke: #3b3b3b; stroke-width: 1.2; }
-.s3-pic .lens { fill: #1d232b; }
-.s3-pic .cap, .s3-pic .steel { fill: #4a525d; }
-.s3-pic .led { fill: var(--s3c); }
-.s3-bad .s3-pic .led { animation: blink-box 0.8s infinite; }
-.s3-pic .field { fill: var(--s3c); opacity: 0.1; }
-.s3-pic .beam { stroke: var(--s3c); stroke-width: 2; stroke-dasharray: 7 5; }
-.s3-ok .s3-pic .beam, .s3-bad .s3-pic .beam { animation: s3-beam 0.8s linear infinite; }
-.s3-pic .beam-dead { stroke: #9aa3ad; stroke-dasharray: 2 4; opacity: 0.6; animation: none !important; }
-@keyframes s3-beam { to { stroke-dashoffset: -12; } }
-.s3-pic .skin { fill: #f1c27d; stroke: #a8743f; stroke-width: 1; }
-.s3-pic .sleeve { fill: #2f5d8a; }
-.s3-pic .cuff { fill: #24476b; }
-.s3-pic .arm { stroke: #3b3b3b; stroke-width: 4; stroke-linecap: round; }
-.s3-pic .roller { fill: #2b2f36; stroke: #9aa3ad; stroke-width: 2; }
-.s3-pic .pivot { fill: #9aa3ad; }
-.s3-pic .limit-line { stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.s3-pic .carriage .body { fill: #2f5d8a; stroke: #1c3a5a; stroke-width: 1.2; }
-.s3-pic .carriage .window { fill: #9cc3e6; }
-.s3-pic .carriage .cam { fill: #6b7480; stroke: #3b3b3b; stroke-width: 1; }
-.s3-pic .carriage .wheel { fill: #2b2f36; stroke: #9aa3ad; stroke-width: 2; }
-.s3-pic .zone-ok { fill: var(--green); opacity: 0.8; }
-.s3-pic .zone-bad { fill: var(--red); opacity: 0.8; }
-.s3-pic .warn polygon { fill: var(--amber); stroke: #3b3b3b; stroke-width: 1.5; stroke-linejoin: round; }
-.s3-pic .warn text { font: 800 20px sans-serif; text-anchor: middle; fill: #1d232b; }
-.s3-pic .warn { animation: blink-box 0.8s infinite; }
-.s3-pic .shield { fill: var(--s3c); stroke: rgba(0, 0, 0, 0.3); stroke-width: 2; }
-.s3-pic .mark { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
-.s3-pic .mark-dot { fill: #fff; }
+/* light curtain: label, bar, emitter studs facing the chassis (bottom one mirrored) */
+.s3-curtain { width: 58%; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.s3-layer-bottom .s3-curtain { flex-direction: column-reverse; }
+.lc-bar { width: 100%; height: 26px; display: flex; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3)); }
+.lc-cap { width: 26px; flex: none; background: #2a2f36; border-radius: 9px 0 0 9px; }
+.lc-cap:last-child { border-radius: 0 9px 9px 0; }
+.lc-body {
+  flex: 1; position: relative;
+  background: linear-gradient(180deg, #ffc62e, #f0a400);
+  border-bottom: 6px solid #1d232b;          /* the lens strip faces the chassis */
+}
+.s3-layer-bottom .lc-body { border-bottom: 0; border-top: 6px solid #1d232b; background: linear-gradient(0deg, #ffd84a, #e9c000); }
+.lc-led {
+  position: absolute; right: 8px; top: 50%; width: 10px; height: 10px; margin-top: -5px;
+  border-radius: 50%; background: var(--s3c); box-shadow: 0 0 6px var(--s3c);
+}
+.s3-bad .lc-led { animation: blink-box 0.6s infinite; }
+.lc-studs { width: calc(100% - 52px); height: 7px; margin-top: -0.3rem; display: flex; justify-content: space-between; }
+.s3-layer-bottom .lc-studs { margin-top: 0; margin-bottom: -0.3rem; }
+.lc-studs i { width: 5px; background: #1d232b; border-radius: 0 0 2px 2px; }
+.s3-layer-bottom .lc-studs i { border-radius: 2px 2px 0 0; }
+
+/* beams onto the chassis */
+.s3-rays { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; overflow: visible; }
+.s3-rays .ray-ok { stroke: var(--green); stroke-width: 1.5; opacity: 0.45; }
+.s3-rays .ray-bad {
+  stroke: #ff2b2b; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 14 8;
+  filter: drop-shadow(0 0 4px #ff2b2b);
+  animation: s3-beam 0.6s linear infinite, blink-box 1s infinite;
+}
+.s3-rays .sheet { animation: none; }
+@keyframes s3-beam { to { stroke-dashoffset: -22; } }
+
+/* over-travel limit switch: at the right-hand end of its row */
+.s3-switch {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  display: flex; align-items: flex-start; gap: 0.5rem;
+}
+.s3-layer-bottom .s3-switch { align-items: flex-end; }
+.ls { height: 100%; width: auto; overflow: visible; }
+.ls-mount { fill: #2a2f36; }
+.ls-body { fill: #f0a400; stroke: #2a2f36; stroke-width: 2.5; }
+.ls-window { fill: #1d232b; }
+.ls-led { fill: var(--s3c); }
+.s3-bad .ls-led { animation: blink-box 0.6s infinite; }
+.ls-arm { stroke: #2a2f36; stroke-width: 5; stroke-linecap: round; }
+.ls-roller { fill: #1d232b; stroke: #6b7480; stroke-width: 2; }
+.ls-pivot { fill: #9aa3ad; }
+.ls-burst line { stroke: #ff2b2b; stroke-width: 4; stroke-linecap: round; filter: drop-shadow(0 0 3px #ff2b2b); }
+.ls-burst { animation: blink-box 0.6s infinite; }
+
+/* any other S3 signal: beacon lamp */
+.s3-beacon { display: flex; align-items: center; gap: 0.5rem; }
+.beacon i {
+  display: block; width: 26px; height: 26px; border-radius: 50% 50% 4px 4px;
+  background: var(--s3c); box-shadow: 0 0 10px var(--s3c); border: 2px solid #2a2f36;
+}
+.s3-bad .beacon i { animation: blink-box 0.6s infinite; box-shadow: 0 0 18px 6px rgba(255, 43, 43, 0.7); }

@@ -61,14 +61,18 @@
     const all = tools();
     const placed = all.filter(isPlaced), unplaced = all.filter(t => !isPlaced(t));
 
-    const bad = all.filter(t => t.status === "NOT OK").length;
-    const waiting = all.filter(t => t.status === "PENDING").length;
+    const checks = all.concat(st.s3 || []);   // torque wrenches and S3 controls
+    const bad = checks.filter(t => t.status === "NOT OK").length;
+    const waiting = checks.filter(t => t.status === "PENDING").length;
     const parts = [bad && `${bad} NOT OK`, waiting && `${waiting} AWAITING DATA`].filter(Boolean);
     const rib = $("status-ribbon");
     if (st.error) { rib.className = "status-ribbon ribbon-red"; rib.textContent = "TEMPLATE MISTAKE - SEE ABOVE"; }
     else if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "EDITING POSITIONS"; }
-    else if (!all.length) { rib.className = "status-ribbon ribbon-idle"; rib.textContent = "NO TORQUE WRENCHES AT THIS STATION"; }
-    else if (!parts.length) { rib.className = "status-ribbon ribbon-green"; rib.textContent = "ALL TORQUES OK"; }
+    else if (!checks.length) { rib.className = "status-ribbon ribbon-idle"; rib.textContent = "NOTHING SET UP FOR THIS STATION"; }
+    else if (!parts.length) {
+      rib.className = "status-ribbon ribbon-green";
+      rib.textContent = !all.length ? "ALL S3 CONTROLS OK" : (st.s3 || []).length ? "ALL OK" : "ALL TORQUES OK";
+    }
     else { rib.className = "status-ribbon " + (bad ? "ribbon-red" : "ribbon-idle"); rib.textContent = parts.join(" · "); }
 
     // Up to 3 boxes above and 3 below: circles in the top half of the picture get a box above,
@@ -89,10 +93,15 @@
 
   // Make the chassis as big as possible while the whole page (boxes above and below,
   // un-placed boxes, footer) still fits on one screen without a scroll bar.
+  // Every station gets the same height: the one at which the WIDEST picture (--widest-aspect
+  // in style.css) just fits the panel width.
   function fitToScreen() {
-    const img = $("chassis-img");
+    const img = $("chassis-img"), view = $("station-view");
     if (!img || !img.naturalWidth) { drawLeaders(); return; }
-    img.style.maxHeight = "";                       // start from the CSS upper limit
+    const cs = getComputedStyle(view);
+    const width = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const widest = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--widest-aspect")) || 3.72;
+    img.style.maxHeight = Math.floor(width / widest) + "px";
     const overflow = document.documentElement.scrollHeight - window.innerHeight;
     if (overflow > 0) {
       const h = img.getBoundingClientRect().height;
@@ -130,6 +139,7 @@
       });
     });
     svg.innerHTML = paths.join("");
+    if (window.drawS3Rays) window.drawS3Rays();
   }
 
   // hover a circle or a box -> highlight both and the line between them

@@ -36,7 +36,7 @@
   function card(t) {
     const cls = statusClass(t.status);
     return `<div class="tool-box tool-${cls}" data-tag="${esc(t.tag)}">
-      <div class="tool-title">${esc(t.tag)}: ${esc(t.label)}</div>
+      <div class="tool-title" title="${esc(t.tag)}: ${esc(t.label)}">${esc(t.tag)}: ${esc(t.label)}</div>
       <div class="tool-meta">
         ${t.mode === "BYPASS" ? '<span class="chip chip-bypass">BYPASS</span>' : ""}
         ${t.status === "PENDING" ? '<span class="chip">awaiting data</span>' : ""}
@@ -71,9 +71,15 @@
     else { rib.className = "status-ribbon " + (bad ? "ribbon-red" : "ribbon-idle"); rib.textContent = parts.join(" · "); }
 
     // top half of the picture -> box above, bottom half -> box below; left to right
+    // Up to 3 boxes above and 3 below: circles in the top half of the picture get a box above,
+    // the rest below; if one half has more than 3, the ones nearest the middle move to the other row.
     const byX = (a, b) => a.x - b.x;
-    $("callouts-top").innerHTML = placed.filter(t => t.y < 50).sort(byX).map(card).join("");
-    $("callouts-bottom").innerHTML = placed.filter(t => t.y >= 50).sort(byX).map(card).join("");
+    const byY = [...placed].sort((a, b) => a.y - b.y);
+    let topCount = Math.min(3, byY.filter(t => t.y < 50).length);
+    if (byY.length - topCount > 3) topCount = byY.length - 3;
+    const topRow = byY.slice(0, topCount), bottomRow = byY.slice(topCount);
+    $("callouts-top").innerHTML = topRow.sort(byX).map(card).join("");
+    $("callouts-bottom").innerHTML = bottomRow.sort(byX).map(card).join("");
     $("markers").innerHTML = placed.map(marker).join("");
     $("unplaced").innerHTML = unplaced.map(card).join("");
     $("unplaced-section").hidden = !unplaced.length;

@@ -29,12 +29,12 @@ def test_template_edits_are_picked_up_without_restart(tmp_path, monkeypatch):
     page.write_text('{% extends "station_base.html" %}{% set tools = [{"t_no": "t7", "x": 150, "y": 10}] %}')
     monkeypatch.setattr(line2.app, "root_path", str(tmp_path))
     cfg = line2.station_config(99)
-    assert cfg["tools"] == [{"t_no": "T7", "x": 100, "y": 10}] and cfg["chassis_image"] == "IMG_1.jpg"
+    assert cfg["tools"] == [{"t_no": "T7", "name": "", "x": 100, "y": 10}] and cfg["chassis_image"] == "IMG_1.jpg"
     page.write_text('{% extends "station_base.html" %}{% set chassis_image = "IMG_3.jpg" %}'
                     '{% set tools = [{"t_no": "T8"}, {"x": 5}] %}')
     os.utime(page, (time.time() + 5, time.time() + 5))
     cfg = line2.station_config(99)
-    assert cfg["tools"] == [{"t_no": "T8", "x": None, "y": None}] and cfg["chassis_image"] == "IMG_3.jpg"
+    assert cfg["tools"] == [{"t_no": "T8", "name": "", "x": None, "y": None}] and cfg["chassis_image"] == "IMG_3.jpg"
 
 
 def test_build_station_statuses():
@@ -44,7 +44,7 @@ def test_build_station_statuses():
     st = line2.build_station(5, mapping, torques)
     assert (st["vc_number"], st["mat_number"], st["status"]) == ("VC5", "MAT5", "red")
     t18, t23 = st["tools"]
-    assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB")   # name from SQL
+    assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB bolt fitment")  # name from template
     assert t23["status"] == "NOT OK"
     assert line2.build_station(5, mapping, {})["tools"][0]["status"] == "PENDING"
     assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no wrenches in template
@@ -89,7 +89,7 @@ def test_pages_and_api(client):
     assert client.get("/station/3").status_code == 200
     assert client.get("/station/18").status_code == 404
     home = client.get("/").get_data(as_text=True)
-    assert "Background.jpg" in home and ">St17<" in home
+    assert "Background.jpg" in home and ">STN - 17<" in home
 
 
 # ---------------- manager login + saving positions into the template ----------------
@@ -132,8 +132,8 @@ def test_save_positions_needs_login_and_rewrites_template(client, station_copy):
     res = client.post("/api/station/5/positions", json=body, headers={"X-CSRF-Token": _csrf(client)})
     assert res.status_code == 200, res.get_json()
     text = (station_copy / "station_5.html").read_text()
-    assert '{"t_no": "T18", "x": 44.6, "y": 75.9},' in text
-    assert '{"t_no": "T23", "x": 78.2, "y": 73.3},' in text   # untouched
+    assert '{"t_no": "T18", "name": "ARB bolt fitment", "x": 44.6, "y": 75.9},' in text   # name kept
+    assert '{"t_no": "T23", "name": "Front/rear ARB", "x": 78.2, "y": 73.3},' in text   # untouched
     assert "positions last saved" in text and "by Manager1" in text
     assert "Station 5 - which torque wrenches" in text and 'chassis_image = "IMG_2.jpg"' in text  # rest kept
     assert (station_copy / "station_5.html.bak").exists()

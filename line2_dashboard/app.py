@@ -10,8 +10,8 @@ Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
     {% set chassis_image = "IMG_2.jpg" %}
     {% set tools = [ {"t_no": "T18", "x": 16, "y": 33}, ... ] %}
-Only the wrench number (and circle position) is in the template; the name on the
-box always comes from T_Name in SQL.
+The name on each box is typed in the template too ("name"); SQL only supplies the
+counts and bypass state.
 The app reads that list from the template itself, so the station page and its
 tile on the overview always agree.
 
@@ -229,6 +229,7 @@ def station_config(station_id):
         x, y = t.get("x"), t.get("y")
         placed = isinstance(x, (int, float)) and isinstance(y, (int, float))
         tools.append({"t_no": str(t["t_no"]).strip().upper(),
+                      "name": str(t.get("name") or "").strip(),
                       "x": min(100, max(0, x)) if placed else None,
                       "y": min(100, max(0, y)) if placed else None})
     config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools}
@@ -248,7 +249,7 @@ def build_station(station_id, mapping, torques):
             status = "OK" if row["actual"] >= row["set"] else "NOT OK"
         tools.append({
             "tag": t["t_no"],
-            "label": (row or {}).get("name") or t["t_no"],  # T_Name from SQL
+            "label": t["name"] or t["t_no"],  # name typed in the station template
             "x": t["x"], "y": t["y"],
             "set": (row or {}).get("set"),
             "actual": (row or {}).get("actual"),
@@ -357,7 +358,7 @@ def save_positions(station_id, positions, username):
         if p is not None:
             x, y = (round(min(100.0, max(0.0, float(p[k]))), 1) for k in ("x", "y"))
             x, y = (int(v) if float(v).is_integer() else v for v in (x, y))
-        entry = {"t_no": t["t_no"]}
+        entry = {"t_no": t["t_no"], "name": t["name"]}
         if x is not None:
             entry.update(x=x, y=y)
         lines.append("    " + json.dumps(entry, ensure_ascii=False) + ",")

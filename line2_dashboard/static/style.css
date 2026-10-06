@@ -1,5 +1,8 @@
 /* Same look as the Line-3 andon dashboard (navy/gold topbar, green/red tiles). */
 :root {
+  /* every station reserves one row of up to 3 boxes above and one below the chassis
+     (6 wrenches max), so the chassis is the same size on every station */
+  --box-h: 6.6rem;
   /* screen height used by everything on a station page except the chassis picture */
   --chassis-reserve: 330px;  /* upper limit only - station.js shrinks it until nothing scrolls */
   --topbar-h: 66px;
@@ -239,6 +242,7 @@ body {
 .ribbon-edit { background: var(--blue); }
 
 .callouts {
+  min-height: var(--box-h);
   display: flex;
   flex-wrap: wrap;
   justify-content: space-evenly;
@@ -246,7 +250,6 @@ body {
   gap: 1rem;
   position: relative;
   z-index: 2;
-  min-height: 0.5rem;
 }
 .callouts-bottom { align-items: flex-start; }
 
@@ -272,12 +275,13 @@ body {
 
 /* short desktop screens (e.g. 1366x768): more compact boxes leave more room for the chassis */
 @media (max-height: 760px) {
+  :root { --box-h: 5.9rem; }
   .station-top { margin-bottom: 0.5rem; }
   .plate { padding: 0.2rem 1.5rem 0.3rem; }
   .plate-value { font-size: 1.3rem; }
   .station-view { padding-top: 2.1rem; padding-bottom: 1.2rem; }
   .chassis-box { margin: 0.7rem auto; }
-  .tool-box { padding: 0.35rem 0.8rem 0.4rem; width: 230px; }
+  .tool-box { padding: 0.35rem 0.8rem 0.4rem; width: 250px; }
   .tool-title { font-size: 0.95rem; }
   .tool-row { font-size: 0.95rem; }
   .bar { margin-top: 0.25rem; }
@@ -343,7 +347,11 @@ body {
 /* callout boxes (same look as the mock-up) */
 .tool-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
 .tool-box {
-  width: 250px;
+  width: 290px;
+  height: var(--box-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   border-radius: 12px;
   padding: 0.55rem 1rem 0.6rem;
   color: var(--ink);
@@ -355,7 +363,10 @@ body {
 .tool-box.tool-bad { background: linear-gradient(180deg, #f04848, var(--red)); }
 .tool-box.tool-pending { background: repeating-linear-gradient(135deg, #b9c0ca 0 14px, #a6aeb9 14px 28px); }
 .tool-box.hl { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
-.tool-title { text-align: center; font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
+.tool-title {
+  text-align: center; font-size: 1.05rem; font-weight: 800; line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;  /* long names end in "..." - full name on hover */
+}
 .tool-meta { display: flex; justify-content: center; gap: 0.4rem; margin: 0.2rem 0 0.25rem; }
 .tool-meta:empty { margin: 0.15rem 0; }
 .chip {

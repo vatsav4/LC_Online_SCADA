@@ -10,17 +10,17 @@
                    IMG_5.jpg  side view, complete with wheels
                  (add more pictures to static/chassis/ and use their file name here)
 
-  tools          one line per wrench:  {"t_no": "T18", "x": 16, "y": 33},
+  tools          one line per wrench:  {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 33},
                    t_no  wrench number as in Torques_Actual_Data (T18 = WinCC SA_T18).
-                         The name on the box comes from T_Name in SQL.
+                   name  text shown on the box (type it here; "" shows just the T number).
                    x, y  circle position in % from the left / top of the picture.
                          Set by a line manager: Manager login -> Edit positions -> drag -> Save.
-                         For a new wrench just write {"t_no": "T5"}; it then appears below the
+                         For a new wrench just write {"t_no": "T5", "name": "..."}; it appears below the
                          picture until a manager places it.
 
   Saving this file is enough - refresh the browser, no restart needed.
 #}
 {% set chassis_image = "IMG_1.jpg" %}
 {% set tools = [
-    {"t_no": "T39", "x": 30, "y": 50.9},
+    {"t_no": "T39", "name": "EGP clamp bolt tightening", "x": 30, "y": 50.9},
 ] %}

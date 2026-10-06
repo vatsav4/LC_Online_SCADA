@@ -3,3 +3,17 @@
 {% set chassis_image = "IMG_3.jpg" %}
 {% set tools = [
 ] %}
+
+{#
+  S3 controls shown in the panel on the right (logged by wincc/S3_Controls_To_SQL_Action.vbs).
+    tag      WinCC tag name, as in dbo.S3_Controls_Data.Tag_Name
+    name     text shown on the card
+    picture  optional: "light_curtain", "over_travel" or "sensor"
+             (left out = chosen from the tag name)
+  Status 1 = NOT OK (red), 0 = OK (green).
+#}
+{% set s3_controls = [
+    {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Light Curtain LH"},
+    {"tag": "Inversion_Light_Curtain_RH", "name": "Inversion Light Curtain RH"},
+    {"tag": "Inversion_Over_Travel", "name": "Inversion Over Travel"},
+] %}

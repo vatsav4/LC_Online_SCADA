@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import time
 import types
@@ -18,10 +19,56 @@ def test_every_station_template_has_a_valid_tool_list():
             assert t["t_no"].startswith("T") and 0 <= t["x"] <= 100 and 0 <= t["y"] <= 100
 
 
-def test_station_5_template_lists_its_wrenches():
+STATION_5 = """{% extends "station_base.html" %}
+{# Station 5 - which torque wrenches are shown on this station's page. #}
+{% set chassis_image = "IMG_2.jpg" %}
+{% set tools = [
+    {"t_no": "T18", "name": "ARB bolt fitment", "x": 16, "y": 27},
+    {"t_no": "T23", "name": "Front/rear ARB", "x": 78.2, "y": 73.3},
+] %}
+"""
+
+STATION_7 = """{% extends "station_base.html" %}
+{% set tools = [] %}
+{% set s3_controls = [
+    {"tag": "Inversion_Light_Curtain_LH", "name": "Light Curtain LH"},
+    {"tag": "Inversion_Over_Travel"},
+    {"tag": "Door_Switch", "name": "Door", "picture": "sensor"},
+] %}
+"""
+
+
+@pytest.fixture
+def known_templates(tmp_path, monkeypatch):
+    """Stations 5 and 7 with fixed contents, so tests don't depend on the real (edited) templates."""
+    (tmp_path / "templates").mkdir()
+    (tmp_path / "templates" / "station_5.html").write_text(STATION_5)
+    (tmp_path / "templates" / "station_7.html").write_text(STATION_7)
+    shutil.copy(os.path.join(TEMPLATES, "station_generic.html"), tmp_path / "templates")
+    monkeypatch.setattr(line2.app, "root_path", str(tmp_path))
+    line2._template_cache.clear()
+    yield tmp_path / "templates"
+    line2._template_cache.clear()
+
+
+def test_station_template_lists_its_wrenches_and_s3_controls(known_templates):
     tools = line2.station_config(5)["tools"]
     assert [(t["t_no"], t["x"], t["y"]) for t in tools] == [("T18", 16, 27), ("T23", 78.2, 73.3)]
+    s3 = line2.station_config(7)["s3_controls"]
+    assert s3 == [
+        {"tag": "INVERSION_LIGHT_CURTAIN_LH", "name": "Light Curtain LH", "picture": "light_curtain"},
+        {"tag": "INVERSION_OVER_TRAVEL", "name": "Inversion Over Travel", "picture": "over_travel"},
+        {"tag": "DOOR_SWITCH", "name": "Door", "picture": "sensor"},
+    ]
 
+
+def test_template_mistake_does_not_break_home_page(known_templates, client):
+    (known_templates / "station_5.html").write_text(STATION_5.replace("] %}", "<!-- x --> ] %}"))
+    cfg = line2.station_config(5)
+    assert cfg["tools"] == [] and "station_5.html line" in cfg["error"]
+    assert client.get("/api/status").status_code == 200
+    with pytest.raises(ValueError):
+        line2.save_positions(5, {}, "someone")   # never overwrite a broken template
 
 def test_template_edits_are_picked_up_without_restart(tmp_path, monkeypatch):
     (tmp_path / "templates").mkdir()
@@ -37,7 +84,7 @@ def test_template_edits_are_picked_up_without_restart(tmp_path, monkeypatch):
     assert cfg["tools"] == [{"t_no": "T8", "name": "", "x": None, "y": None}] and cfg["chassis_image"] == "IMG_3.jpg"
 
 
-def test_build_station_statuses():
+def test_build_station_statuses(known_templates):
     mapping = {5: {"vc": "VC5", "mat": "MAT5"}}
     torques = {"T18": {"name": "ARB", "set": 4, "actual": 4, "bypass": True},
                "T23": {"name": "ARB 2", "set": 4, "actual": 1, "bypass": False}}
@@ -47,21 +94,43 @@ def test_build_station_statuses():
     assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB bolt fitment")  # name from template
     assert t23["status"] == "NOT OK"
     assert line2.build_station(5, mapping, {})["tools"][0]["status"] == "PENDING"
-    assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no wrenches in template
+    assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no template, nothing to check
+
+
+def test_s3_status_1_is_not_ok(known_templates):
+    from datetime import datetime
+    s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": 1, "changed": datetime.now()},
+          "INVERSION_OVER_TRAVEL": {"value": 0, "changed": None}}
+    st = line2.build_station(7, {}, {}, s3)
+    assert [c["status"] for c in st["s3"]] == ["NOT OK", "OK", "PENDING"] and st["status"] == "red"
+    assert st["s3"][0]["since"].count(":") == 2
+    s3["INVERSION_LIGHT_CURTAIN_LH"]["value"] = 0
+    s3["DOOR_SWITCH"] = {"value": 0, "changed": None}
+    assert line2.build_station(7, {}, {}, s3)["status"] == "green"
+    summary = line2._summary([line2.build_station(7, {}, {}, s3)])[0]
+    assert (summary["ok"], summary["total"]) == (3, 3)
 
 
 def test_fetch_tables_reads_both_tables():
+    results = [[(1, "VC1 ", "MAT1")], [("t1 ", " SG ", 5, 3, 1), (None, "", 0, 0, 0)],
+               [("Inversion_Over_Travel", True, None), ("X", None, None)]]
     class Cur:
-        def __init__(self):
-            self.results = [[(1, "VC1 ", "MAT1")], [("t1 ", " SG ", 5, 3, 1), (None, "", 0, 0, 0)]]
         def execute(self, sql):
-            self.rows = self.results.pop(0)
+            self.rows = results.pop(0)
         def fetchall(self):
             return self.rows
     conn = types.SimpleNamespace(cursor=lambda: Cur())
-    mapping, torques = line2.fetch_tables(conn)
+    mapping, torques, s3 = line2.fetch_tables(conn)
     assert mapping == {1: {"vc": "VC1", "mat": "MAT1"}}
     assert torques == {"T1": {"name": "SG", "set": 5, "actual": 3, "bypass": True}}
+    assert s3 == {"INVERSION_OVER_TRAVEL": {"value": 1, "changed": None}, "X": {"value": None, "changed": None}}
+
+
+def test_missing_s3_table_does_not_stop_torques():
+    class Cur:
+        def execute(self, sql):
+            raise RuntimeError("Invalid object name 'dbo.S3_Controls_Data'")
+    assert line2.fetch_s3(types.SimpleNamespace(cursor=lambda: Cur())) == {}
 
 
 def test_connection_string_uses_comma_port(monkeypatch):
@@ -82,11 +151,13 @@ def client(monkeypatch):
 def test_pages_and_api(client):
     status = client.get("/api/status").get_json()
     assert status["db_ok"] and len(status["stations"]) == 17
-    st1 = client.get("/api/station/1").get_json()
-    assert [t["tag"] for t in st1["tools"]] == ["T1", "T2", "T3"] and st1["tools"][0]["x"] == 16
+    for n in range(1, 18):
+        page = client.get(f"/station/{n}")
+        assert page.status_code == 200 and b"template-error" not in page.data, n
     page = client.get("/station/5").get_data(as_text=True)
     assert "MAT513357TFJ12784" in page and "chassis/IMG_2.jpg" in page and "Manager login" in page and "edit-toggle" not in page
-    assert client.get("/station/3").status_code == 200
+    st7 = client.get("/api/station/7").get_json()
+    assert len(st7["s3"]) == 3 and "s3-panel" in client.get("/station/7").get_data(as_text=True)
     assert client.get("/station/18").status_code == 404
     home = client.get("/").get_data(as_text=True)
     assert "Background.jpg" in home and ">STN - 17<" in home
@@ -97,7 +168,6 @@ def test_pages_and_api(client):
 @pytest.fixture
 def station_copy(tmp_path, monkeypatch):
     """Point the app at a copy of the templates so tests never modify the real files."""
-    import shutil
     shutil.copytree(os.path.join(os.path.dirname(line2.__file__), "templates"), tmp_path / "templates")
     shutil.copytree(os.path.join(os.path.dirname(line2.__file__), "static"), tmp_path / "static")
     monkeypatch.setattr(line2.app, "root_path", str(tmp_path))
@@ -106,6 +176,7 @@ def station_copy(tmp_path, monkeypatch):
     line2._template_cache.clear()
     from werkzeug.security import generate_password_hash
     monkeypatch.setattr(line2, "MANAGERS", {"manager1": generate_password_hash("secret-pass")})
+    (tmp_path / "templates" / "station_5.html").write_text(STATION_5)
     yield tmp_path / "templates"
     line2.app.jinja_env.loader.searchpath = [os.path.join(os.path.dirname(line2.__file__), "templates")]
     line2._template_cache.clear()

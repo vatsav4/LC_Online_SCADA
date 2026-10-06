@@ -31,7 +31,7 @@ Function action
     ' ---- settings ----------------------------------------------------------------
     ' Line-2 SQL Server: note the COMMA before the port. Edit User ID / Password.
     Const CONN_STR = "Provider=SQLOLEDB;Data Source=172.25.208.39,49561;Initial Catalog=Industry4_157;User ID=CHANGE_ME;Password=CHANGE_ME;"
-    Const TOOL_COUNT = 42                ' wrenches SA_T1 ... SA_T42
+    Const TOOL_COUNT = 46                ' wrenches SA_T1 ... SA_T46 (highest T number used on the dashboard)
     Const T_NO_PREFIX = "T"              ' T_No written as 'T1','T2',... ; "" if T_No is a number column
     Const BYPASS_COLUMN = "Active_Bypass" ' name of the new bypass column in Torques_Actual_Data
     Const TIMEOUT_S = 3                  ' SQL connect and command timeout, seconds

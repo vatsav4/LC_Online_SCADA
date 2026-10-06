@@ -65,12 +65,12 @@
     const waiting = all.filter(t => t.status === "PENDING").length;
     const parts = [bad && `${bad} NOT OK`, waiting && `${waiting} AWAITING DATA`].filter(Boolean);
     const rib = $("status-ribbon");
-    if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "EDITING POSITIONS"; }
-    else if (!all.length) { rib.className = "status-ribbon ribbon-idle"; rib.textContent = "NO WRENCHES IN THIS STATION'S TEMPLATE"; }
+    if (st.error) { rib.className = "status-ribbon ribbon-red"; rib.textContent = "TEMPLATE MISTAKE - SEE ABOVE"; }
+    else if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "EDITING POSITIONS"; }
+    else if (!all.length) { rib.className = "status-ribbon ribbon-idle"; rib.textContent = "NO TORQUE WRENCHES AT THIS STATION"; }
     else if (!parts.length) { rib.className = "status-ribbon ribbon-green"; rib.textContent = "ALL TORQUES OK"; }
     else { rib.className = "status-ribbon " + (bad ? "ribbon-red" : "ribbon-idle"); rib.textContent = parts.join(" · "); }
 
-    // top half of the picture -> box above, bottom half -> box below; left to right
     // Up to 3 boxes above and 3 below: circles in the top half of the picture get a box above,
     // the rest below; if one half has more than 3, the ones nearest the middle move to the other row.
     const byX = (a, b) => a.x - b.x;
@@ -83,6 +83,7 @@
     $("markers").innerHTML = placed.map(marker).join("");
     $("unplaced").innerHTML = unplaced.map(card).join("");
     $("unplaced-section").hidden = !unplaced.length;
+    if (window.renderS3) window.renderS3(st.s3);
     fitToScreen();
   }
 
@@ -226,10 +227,17 @@
 
   $("chassis-img").addEventListener("load", fitToScreen);
   window.addEventListener("resize", fitToScreen);
-  if (window.ResizeObserver) new ResizeObserver(drawLeaders).observe($("station-view"));
+  const observer = window.ResizeObserver ? new ResizeObserver(drawLeaders) : null;
+  if (observer) observer.observe($("station-view"));
 
   render();
   refresh();
   window.__pageIntervals = window.__pageIntervals || [];
   window.__pageIntervals.push(setInterval(refresh, 2000));
+  // spa.js runs these when moving to another page, so listeners don't pile up
+  window.__pageCleanups = window.__pageCleanups || [];
+  window.__pageCleanups.push(() => {
+    window.removeEventListener("resize", fitToScreen);
+    if (observer) observer.disconnect();
+  });
 })();

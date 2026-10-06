@@ -2,28 +2,28 @@
 //
 // Flask still serves complete, real pages for every route - direct loads,
 // refreshes, and bookmarks all keep working normally. This script only
-// intercepts clicks on internal links (station tiles, the Home button,
-// the logo) and swaps in the fetched page's .content / titles instead of
-// doing a full browser navigation. That matters because cycle.js (the
-// live Set/Elapsed timer) and this script are loaded once in base.html
-// and are never part of what gets swapped - a full page reload would
-// destroy and restart cycle.js's state on every click, which is what
-// made the timer visibly reset when moving between stations.
+// intercepts clicks on internal links (station tiles, Home, St n / St n+1)
+// and swaps in the fetched page's .content / titles instead of a full
+// browser navigation, so moving between stations doesn't flash white.
 
 (function () {
-  function clearPageIntervals() {
+  function clearPage() {
     (window.__pageIntervals || []).forEach(clearInterval);
     window.__pageIntervals = [];
+    (window.__pageCleanups || []).forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
+    window.__pageCleanups = [];
+    document.querySelectorAll("script[data-spa-page]").forEach(s => s.remove());
   }
 
+  // Run the new page's own scripts (station.js, s3.js, overview.js). base.html's inline
+  // script and spa.js are already running; data blocks (application/json) are not code.
   function runPageScripts(doc) {
-    doc.querySelectorAll("script").forEach(orig => {
-      const src = orig.getAttribute("src") || "";
-      if (src.includes("cycle.js") || src.includes("spa.js")) return; // already persistent, don't re-run
-
+    doc.querySelectorAll("script[src]").forEach(orig => {
+      if (orig.getAttribute("src").includes("spa.js")) return;
       const s = document.createElement("script");
       Array.from(orig.attributes).forEach(attr => s.setAttribute(attr.name, attr.value));
-      if (!orig.src) s.textContent = orig.textContent;
+      s.async = false;                      // keep page order: s3.js before station.js
+      s.setAttribute("data-spa-page", "");
       document.body.appendChild(s);
     });
   }
@@ -53,7 +53,7 @@
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, "text/html");
 
-      clearPageIntervals();
+      clearPage();
       if (!swapContent(doc)) throw new Error("no .content in response");
       runPageScripts(doc);
 

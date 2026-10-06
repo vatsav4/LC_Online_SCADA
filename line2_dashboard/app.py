@@ -1,17 +1,21 @@
 """
 Line-2 torque dashboard.
 
-Two tables on the Line-2 SQL Server (reachable only on port 49561):
+Tables on the Line-2 SQL Server (reachable only on port 49561):
   dbo.Station_Mapping      StationNumber, VC_Number, MAT_Number   (vehicle at each station)
   dbo.Torques_Actual_Data  T_No, T_Name, Set_Counts, Actual_Counts, Active_Bypass
                            (one row per wrench, written by wincc/Torques_To_SQL_Action.vbs)
+  dbo.S3_Controls_Data     Station_No, Tag_Name, Status, Changed_At
+                           (one row per S3 control, 1 = NOT OK / 0 = OK,
+                            written by wincc/S3_Controls_To_SQL_Action.vbs)
 
 Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
     {% set chassis_image = "IMG_2.jpg" %}
     {% set tools = [ {"t_no": "T18", "x": 16, "y": 33}, ... ] %}
 The name on each box is typed in the template too ("name"); SQL only supplies the
-counts and bypass state.
+counts and bypass state. A station with S3 controls also lists them there:
+    {% set s3_controls = [ {"tag": "Inversion_Light_Curtain_LH", "name": "..."}, ... ] %}
 The app reads that list from the template itself, so the station page and its
 tile on the overview always agree.
 
@@ -39,7 +43,7 @@ import time
 from datetime import datetime
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
-from jinja2 import nodes
+from jinja2 import TemplateSyntaxError, nodes
 from werkzeug.security import check_password_hash, generate_password_hash
 
 # ================= CONFIG =================
@@ -89,6 +93,7 @@ state_lock = threading.Lock()
 state = {
     "mapping": {},   # {station_no: {"vc": .., "mat": ..}}
     "torques": {},   # {"T1": {"name": .., "set": .., "actual": .., "bypass": bool}}
+    "s3": {},        # {"INVERSION_OVER_TRAVEL": {"value": 0 / 1 / None, "changed": datetime}}
     "updated_at": None,
     "db_ok": False,
 }
@@ -130,7 +135,27 @@ def fetch_tables(conn):
     torques = {str(r[0]).strip().upper(): {"name": str(r[1] or "").strip(), "set": _num(r[2]),
                                            "actual": _num(r[3]), "bypass": r[4] in (True, 1, "1")}
                for r in cur.fetchall() if r[0]}
-    return mapping, torques
+    return mapping, torques, fetch_s3(conn)
+
+
+_s3_failed = False  # log a missing / broken S3 table once, not every poll
+
+
+def fetch_s3(conn):
+    """S3 controls; on its own so a missing S3 table never stops the torque data."""
+    global _s3_failed
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT Tag_Name, Status, Changed_At FROM dbo.S3_Controls_Data")
+        rows = cur.fetchall()
+    except Exception as e:
+        if not _s3_failed:
+            logger.error(f"S3_Controls_Data not readable (S3 controls show NO DATA): {e}")
+        _s3_failed = True
+        return {}
+    _s3_failed = False
+    return {str(r[0]).strip().upper(): {"value": None if r[1] is None else int(bool(r[1])), "changed": r[2]}
+            for r in rows if r[0]}
 
 
 def demo_tables():
@@ -145,22 +170,27 @@ def demo_tables():
                "T26": ("Brake hose adapter", 2, 2, 1), "T37": ("Steering return line", 2, 10, 0),
                "T38": ("Urea tank fitment", 6, 6, 1), "T39": ("EGP clamp bolt", 2, 11, 1),
                "T40": ("Air tank bracket", 4, 10, 1)}
+    since = datetime.now().replace(microsecond=0)
+    s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": int(tick % 5 == 0), "changed": since},  # trips now and then
+          "INVERSION_LIGHT_CURTAIN_RH": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)},
+          "INVERSION_OVER_TRAVEL": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)}}
     return ({n: {"vc": vc, "mat": mat} for n, (vc, mat) in mapping.items()},
-            {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()})
+            {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()},
+            s3)
 
 
 def poll_once():
     try:
         if DEMO_MODE:
-            mapping, torques = demo_tables()
+            mapping, torques, s3 = demo_tables()
         else:
             conn = connect(LINE_DB)
             try:
-                mapping, torques = fetch_tables(conn)
+                mapping, torques, s3 = fetch_tables(conn)
             finally:
                 conn.close()
         with state_lock:
-            state["mapping"], state["torques"] = mapping, torques
+            state["mapping"], state["torques"], state["s3"] = mapping, torques, s3
             state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             state["db_ok"] = True
     except Exception as e:
@@ -196,13 +226,26 @@ def station_template(station_id):
 
 
 _template_cache = {}  # template file -> (mtime, config)
+S3_PICTURES = ("light_curtain", "over_travel", "sensor")  # drawings in static/s3.js
+
+
+def _s3_picture(tag, picture):
+    if picture in S3_PICTURES:
+        return picture
+    tag = tag.upper()
+    if "LIGHT_CURTAIN" in tag:
+        return "light_curtain"
+    if "OVER_TRAVEL" in tag or "OVERTRAVEL" in tag:
+        return "over_travel"
+    return "sensor"
 
 
 def station_config(station_id):
-    """The `chassis_image` and `tools` set at the top of templates/station_<n>.html.
+    """The `chassis_image`, `tools` and `s3_controls` set at the top of templates/station_<n>.html.
 
     Re-read automatically when the template file changes, so editing T_Nos
-    needs no restart (only a browser refresh).
+    needs no restart (only a browser refresh). A template with a mistake in it
+    gives an "error" instead of breaking the home page.
     """
     name = station_template(station_id)
     path = os.path.join(app.root_path, "templates", name)
@@ -212,10 +255,17 @@ def station_config(station_id):
         return cached[1]
 
     found = {}
-    with open(path, encoding="utf-8") as f:
-        tree = app.jinja_env.parse(f.read())
+    try:
+        with open(path, encoding="utf-8") as f:
+            tree = app.jinja_env.parse(f.read())
+    except TemplateSyntaxError as e:
+        error = f"{name} line {e.lineno}: {e.message}"
+        logger.error(f"Template mistake, station {station_id} shows nothing until it is fixed: {error}")
+        config = {"chassis_image": DEFAULT_IMAGE, "tools": [], "s3_controls": [], "error": error}
+        _template_cache[path] = (mtime, config)
+        return config
     for node in tree.find_all(nodes.Assign):
-        if isinstance(node.target, nodes.Name) and node.target.name in ("tools", "chassis_image"):
+        if isinstance(node.target, nodes.Name) and node.target.name in ("tools", "chassis_image", "s3_controls"):
             try:
                 found[node.target.name] = node.node.as_const()
             except nodes.Impossible:
@@ -232,12 +282,27 @@ def station_config(station_id):
                       "name": str(t.get("name") or "").strip(),
                       "x": min(100, max(0, x)) if placed else None,
                       "y": min(100, max(0, y)) if placed else None})
-    config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools}
+    s3_controls = []
+    for c in found.get("s3_controls") or []:
+        tag = str(c.get("tag", "")).strip() if isinstance(c, dict) else ""
+        if not tag:
+            logger.error(f"{name}: every S3 control needs a tag, skipped {c!r}")
+            continue
+        s3_controls.append({"tag": tag.upper(), "name": str(c.get("name") or "").strip() or tag.replace("_", " "),
+                            "picture": _s3_picture(tag, c.get("picture"))})
+    config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools,
+              "s3_controls": s3_controls, "error": None}
     _template_cache[path] = (mtime, config)
     return config
 
 
-def build_station(station_id, mapping, torques):
+def _since(changed):
+    if not isinstance(changed, datetime):
+        return ""
+    return f"{changed:%H:%M:%S}" if changed.date() == datetime.now().date() else f"{changed:%d-%m %H:%M}"
+
+
+def build_station(station_id, mapping, torques, s3=None):
     config = station_config(station_id)
     vehicle = mapping.get(station_id, {})
     tools = []
@@ -256,30 +321,41 @@ def build_station(station_id, mapping, torques):
             "mode": "BYPASS" if (row or {}).get("bypass") else ("ACTIVE" if row else ""),
             "status": status,
         })
+    controls = []
+    for c in config["s3_controls"]:
+        row = (s3 or {}).get(c["tag"]) or {}
+        value = row.get("value")
+        controls.append({**c, "status": "PENDING" if value is None else ("NOT OK" if value else "OK"),
+                         "since": _since(row.get("changed"))})
+    checks = tools + controls
     return {
         "station": station_id,
         "vc_number": vehicle.get("vc", ""),
         "mat_number": vehicle.get("mat", ""),
         "image": config["chassis_image"],
         "tools": tools,
-        "status": "idle" if not tools else ("green" if all(t["status"] == "OK" for t in tools) else "red"),
+        "s3": controls,
+        "error": config["error"],
+        "status": "idle" if not checks else ("green" if all(t["status"] == "OK" for t in checks) else "red"),
     }
 
 
 def _snapshot():
     with state_lock:
-        return dict(state["mapping"]), dict(state["torques"]), state["db_ok"], state["updated_at"]
+        return (dict(state["mapping"]), dict(state["torques"]), dict(state["s3"])), state["db_ok"], state["updated_at"]
 
 
 def _all_stations():
-    mapping, torques, db_ok, updated_at = _snapshot()
-    stations = [build_station(n, mapping, torques) for n in range(1, TOTAL_STATIONS + 1)]
+    data, db_ok, updated_at = _snapshot()
+    stations = [build_station(n, *data) for n in range(1, TOTAL_STATIONS + 1)]
     return stations, db_ok, updated_at
 
 
 def _summary(stations):
+    """Home-page tiles: wrenches and S3 controls together."""
     return [{"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
-             "ok": sum(t["status"] == "OK" for t in st["tools"]), "total": len(st["tools"])}
+             "ok": sum(t["status"] == "OK" for t in st["tools"] + st["s3"]),
+             "total": len(st["tools"]) + len(st["s3"])}
             for st in stations]
 
 
@@ -348,6 +424,8 @@ def save_positions(station_id, positions, username):
     path = os.path.join(app.root_path, "templates", name)
     with open(path, encoding="utf-8") as f:
         source = f.read()
+    if station_config(station_id)["error"]:
+        raise ValueError("Fix the mistake in the station template first: " + station_config(station_id)["error"])
     if len(_TOOLS_BLOCK.findall(source)) != 1:
         raise ValueError(f"{name}: expected exactly one '{{% set tools = [...] %}}' block.")
 
@@ -411,9 +489,11 @@ def index():
 def station(station_id):
     if not 1 <= station_id <= TOTAL_STATIONS:
         abort(404)
-    mapping, torques, db_ok, updated_at = _snapshot()
-    return render_template(station_template(station_id), station_id=station_id,
-                           st=build_station(station_id, mapping, torques),
+    data, db_ok, updated_at = _snapshot()
+    st = build_station(station_id, *data)
+    # a template with a mistake is shown with the plain layout and the error, instead of a crash
+    return render_template("station_generic.html" if st["error"] else station_template(station_id),
+                           station_id=station_id, st=st,
                            total_stations=TOTAL_STATIONS, db_ok=db_ok, updated_at=updated_at)
 
 
@@ -427,8 +507,8 @@ def api_status():
 def api_station(station_id):
     if not 1 <= station_id <= TOTAL_STATIONS:
         abort(404)
-    mapping, torques, db_ok, updated_at = _snapshot()
-    return jsonify({**build_station(station_id, mapping, torques), "db_ok": db_ok, "updated_at": updated_at})
+    data, db_ok, updated_at = _snapshot()
+    return jsonify({**build_station(station_id, *data), "db_ok": db_ok, "updated_at": updated_at})
 
 
 def hash_password():

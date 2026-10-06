@@ -39,7 +39,7 @@ If you use a different column name, change `BYPASS_COLUMN` at the top of the scr
 3. Run the editor's syntax check. Set the **Trigger** (Info/Trigger → Timer → *Cyclic*, standard cycle **2 s**).
    Save as `Torques_To_SQL.bac`.
 4. At the top of the script, set **`User ID` and `Password`** in `CONN_STR` (the server `172.25.208.39,49561` is
-   already filled in; keep the comma before the port). Also check `TOOL_COUNT`, the number of wrenches `SA_T1 … SA_T42`.
+   already filled in; keep the comma before the port). Also check `TOOL_COUNT`, the highest wrench number (`SA_T1 … SA_T46` now).
 
 The script uses its **own** SQL connection, not the shared `Local_Connection` of the Station_Mapping script (`VB_S`),
 so the two scripts can't interfere with each other.

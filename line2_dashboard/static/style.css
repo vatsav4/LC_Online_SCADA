@@ -460,13 +460,13 @@ button.home-button { border: 0; }
 
 .s3-tag {
   display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
-  font-size: 0.85rem; padding: 0.12rem 0.25rem 0.12rem 0.7rem; border-radius: 14px;
+  font-size: 1.15rem; padding: 0.12rem 0.3rem 0.12rem 0.8rem; border-radius: 16px;
   background: #fff; border: 2px solid var(--s3c); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 .s3-tag b { text-transform: uppercase; letter-spacing: 0.04em; }
-.s3-state { background: var(--s3c); color: #fff; font-weight: 800; padding: 0.05rem 0.65rem; border-radius: 10px; letter-spacing: 0.05em; }
+.s3-state { background: var(--s3c); color: #fff; font-weight: 800; padding: 0.05rem 0.75rem; border-radius: 12px; letter-spacing: 0.05em; }
 .s3-bad .s3-state { animation: blink-box 1s infinite; }
-.s3-since { color: #556; font-size: 0.75rem; font-variant-numeric: tabular-nums; padding-right: 0.35rem; }
+.s3-since { color: #445; font-size: 0.95rem; font-variant-numeric: tabular-nums; padding-right: 0.35rem; }
 .s3-since:empty { display: none; }
 
 /* light curtain: label, bar, emitter studs facing the chassis (bottom one mirrored) */
@@ -527,3 +527,5 @@ button.home-button { border: 0; }
   background: var(--s3c); box-shadow: 0 0 10px var(--s3c); border: 2px solid #2a2f36;
 }
 .s3-bad .beacon i { animation: blink-box 0.6s infinite; box-shadow: 0 0 18px 6px rgba(255, 43, 43, 0.7); }
+/* the switch's label wraps onto two lines (name / status) so it never runs into a curtain label */
+.s3-switch .s3-tag { flex-wrap: wrap; justify-content: center; max-width: 17.5rem; row-gap: 0.15rem; border-radius: 12px; padding: 0.2rem 0.6rem; }

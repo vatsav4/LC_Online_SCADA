@@ -171,8 +171,9 @@ def demo_tables():
                "T38": ("Urea tank fitment", 6, 6, 1), "T39": ("EGP clamp bolt", 2, 11, 1),
                "T40": ("Air tank bracket", 4, 10, 1)}
     since = datetime.now().replace(microsecond=0)
-    s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": int(tick % 5 == 0), "changed": since},  # trips now and then
-          "INVERSION_LIGHT_CURTAIN_RH": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)},
+    # light curtains: 1 = OK (ok_value 1 in station_7.html); LH trips now and then
+    s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": int(tick % 5 != 0), "changed": since},
+          "INVERSION_LIGHT_CURTAIN_RH": {"value": 1, "changed": since.replace(hour=6, minute=0, second=0)},
           "INVERSION_OVER_TRAVEL": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)}}
     return ({n: {"vc": vc, "mat": mat} for n, (vc, mat) in mapping.items()},
             {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()},
@@ -291,7 +292,9 @@ def station_config(station_id):
         place = c.get("place") if c.get("place") in ("top", "bottom") else (
             "bottom" if tag.upper().endswith(("_RH", "RH")) else "top")   # RH side drawn below the chassis
         s3_controls.append({"tag": tag.upper(), "name": str(c.get("name") or "").strip() or tag.replace("_", " "),
-                            "picture": _s3_picture(tag, c.get("picture")), "place": place})
+                            "picture": _s3_picture(tag, c.get("picture")), "place": place,
+                            # tag value that means OK: 0 normally, 1 for signals like the inversion light curtains
+                            "ok_value": 1 if c.get("ok_value") == 1 else 0})
     config = {"chassis_image": found.get("chassis_image") or DEFAULT_IMAGE, "tools": tools,
               "s3_controls": s3_controls, "error": None}
     _template_cache[path] = (mtime, config)
@@ -327,7 +330,7 @@ def build_station(station_id, mapping, torques, s3=None):
     for c in config["s3_controls"]:
         row = (s3 or {}).get(c["tag"]) or {}
         value = row.get("value")
-        controls.append({**c, "status": "PENDING" if value is None else ("NOT OK" if value else "OK"),
+        controls.append({**c, "status": "PENDING" if value is None else ("OK" if value == c["ok_value"] else "NOT OK"),
                          "since": _since(row.get("changed"))})
     checks = tools + controls
     return {
@@ -354,10 +357,10 @@ def _all_stations():
 
 
 def _summary(stations):
-    """Home-page tiles: wrenches and S3 controls together."""
+    """Home-page tiles: L3 (torque wrenches) and S3 controls, counted separately."""
     return [{"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
-             "ok": sum(t["status"] == "OK" for t in st["tools"] + st["s3"]),
-             "total": len(st["tools"]) + len(st["s3"])}
+             "l3_ok": sum(t["status"] == "OK" for t in st["tools"]), "l3_total": len(st["tools"]),
+             "s3_ok": sum(c["status"] == "OK" for c in st["s3"]), "s3_total": len(st["s3"])}
             for st in stations]
 
 

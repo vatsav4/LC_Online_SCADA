@@ -1,4 +1,4 @@
-// Refreshes the All Stations tiles from /api/status.
+// Refreshes the All Stations tiles (L3 torque wrenches and S3 controls) from /api/status.
 (function () {
   function setConnection(ok, updatedAt) {
     const conn = document.getElementById("conn");
@@ -18,7 +18,9 @@
         if (!el) return;
         el.classList.remove("tile-green", "tile-red", "tile-idle");
         el.classList.add("tile-" + st.status);
-        el.querySelector(".tile-count").textContent = st.ok + "/" + st.total + " OK";
+        const l3 = el.querySelector('[data-kind="l3"]'), s3 = el.querySelector('[data-kind="s3"]');
+        if (l3) l3.textContent = `L3 ${st.l3_ok}/${st.l3_total}`;
+        if (s3) s3.textContent = `S3 ${st.s3_ok}/${st.s3_total}`;
       });
       const count = s => data.stations.filter(st => st.status === s).length;
       const sum = document.getElementById("home-summary");

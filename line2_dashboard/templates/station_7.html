@@ -12,12 +12,13 @@
              (left out = chosen from the tag name)
     place    optional: "top" (above the chassis) or "bottom" (below it)
              (left out = tags ending in RH go below, the rest above)
-  Status 1 = NOT OK (red light), 0 = OK (green).
+    ok_value optional: the tag value that means OK. Left out = 0 (0 green, 1 red);
+             1 = reversed (1 green, 0 red), used for the light curtains below.
   The S3 devices use the rows above / below the chassis, so a station with S3 devices
   should not also have torque wrenches in those rows.
 #}
 {% set s3_controls = [
-    {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Light Curtain LH"},
-    {"tag": "Inversion_Light_Curtain_RH", "name": "Inversion Light Curtain RH"},
+    {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Light Curtain LH", "ok_value": 1},
+    {"tag": "Inversion_Light_Curtain_RH", "name": "Inversion Light Curtain RH", "ok_value": 1},
     {"tag": "Inversion_Over_Travel", "name": "Inversion Over Travel"},
 ] %}

@@ -20,9 +20,11 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
 table yet. Bypassed wrenches get a BYPASS badge and an amber rim on the circle.
 
-An S3 control is **green** when its tag is 0 (OK) and **red** when it is 1 (NOT OK), with the time it last changed.
+An S3 control is **green** when its tag is 0 (OK) and **red** when it is 1 (NOT OK) - reversed for controls with
+`"ok_value": 1`, like the inversion light curtains -, with the time it last changed.
 If `S3_Controls_Data` doesn't exist yet, the S3 cards show NO DATA and the torques keep working.
-A station's home tile counts its wrenches and S3 controls together.
+A station's home tile shows its L3 (torque wrench) and S3 counts separately, e.g. `L3 2/3` and `S3 3/3`; the tile is
+green only when both are all OK.
 
 ## Files
 
@@ -89,6 +91,8 @@ Add an `s3_controls` list to the station's template (see `station_7.html`):
 - **`tag`:** the WinCC tag name, as logged in `S3_Controls_Data.Tag_Name` (also add it to the `CONTROLS` list in
   `wincc/S3_Controls_To_SQL_Action.vbs`).
 - **`picture`** (optional): `"light_curtain"`, `"over_travel"` or `"sensor"`. Left out, it's chosen from the tag name.
+- **`ok_value`** (optional): the tag value that means OK. Left out it's `0` (0 green, 1 red). The inversion light
+  curtains use `1` (1 green, 0 red).
 - **`place`** (optional): `"top"` (above the chassis) or `"bottom"` (below). Left out, tags ending in `RH` go below.
 
 The devices are drawn in the rows above and below the chassis: a light curtain as a bar whose beams shine onto the

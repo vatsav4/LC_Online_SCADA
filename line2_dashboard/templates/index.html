@@ -13,16 +13,21 @@
       <span class="sum-idle"><b>{{ stations|selectattr('status', 'equalto', 'idle')|list|length }}</b> not set up</span>
     </div>
     <div class="home-legend">
-      <span><i class="swatch tile-green"></i>All torques OK</span>
+      <span><i class="swatch tile-green"></i>All L3 &amp; S3 OK</span>
       <span><i class="swatch tile-red"></i>NOT OK / awaiting</span>
-      <span><i class="swatch tile-idle"></i>No wrenches set up</span>
+      <span><i class="swatch tile-idle"></i>Nothing set up</span>
+      <span class="legend-note">L3 = torque wrenches · S3 = safety controls</span>
     </div>
     <div class="station-grid" id="station-grid">
       {% for st in stations %}
       <a class="station-tile tile-{{ st.status }}" id="station-tile-{{ st.id }}"
          href="{{ url_for('station', station_id=st.id) }}" title="Station {{ st.id }}">
         <span class="tile-name">STN - {{ st.id }}</span>
-        <span class="tile-count">{{ st.ok }}/{{ st.total }} OK</span>
+        <span class="tile-counts">
+          {% if st.l3_total %}<span class="tile-count" data-kind="l3">L3 {{ st.l3_ok }}/{{ st.l3_total }}</span>{% endif %}
+          {% if st.s3_total %}<span class="tile-count" data-kind="s3">S3 {{ st.s3_ok }}/{{ st.s3_total }}</span>{% endif %}
+          {% if not st.l3_total and not st.s3_total %}<span class="tile-count">not set up</span>{% endif %}
+        </span>
       </a>
       {% endfor %}
     </div>

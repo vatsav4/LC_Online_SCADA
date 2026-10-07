@@ -179,6 +179,8 @@ body {
 }
 .station-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); }
 .tile-name { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.tile-counts { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: center; }
+.legend-note { flex-basis: 100%; color: #9fb0c2; }
 .tile-count { font-size: 0.75rem; background: rgba(0, 0, 0, 0.2); padding: 0.05rem 0.55rem; border-radius: 10px; }
 
 .tile-green { background: var(--green); }

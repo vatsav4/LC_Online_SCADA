@@ -34,6 +34,7 @@ STATION_7 = """{% extends "station_base.html" %}
     {"tag": "Inversion_Light_Curtain_LH", "name": "Light Curtain LH"},
     {"tag": "Inversion_Over_Travel"},
     {"tag": "Door_Switch_RH", "name": "Door", "picture": "sensor"},
+    {"tag": "Curtain_Reversed", "name": "Reversed", "ok_value": 1},
 ] %}
 """
 
@@ -56,9 +57,10 @@ def test_station_template_lists_its_wrenches_and_s3_controls(known_templates):
     assert [(t["t_no"], t["x"], t["y"]) for t in tools] == [("T18", 16, 27), ("T23", 78.2, 73.3)]
     s3 = line2.station_config(7)["s3_controls"]
     assert s3 == [
-        {"tag": "INVERSION_LIGHT_CURTAIN_LH", "name": "Light Curtain LH", "picture": "light_curtain", "place": "top"},
-        {"tag": "INVERSION_OVER_TRAVEL", "name": "Inversion Over Travel", "picture": "over_travel", "place": "top"},
-        {"tag": "DOOR_SWITCH_RH", "name": "Door", "picture": "sensor", "place": "bottom"},
+        {"tag": "INVERSION_LIGHT_CURTAIN_LH", "name": "Light Curtain LH", "picture": "light_curtain", "place": "top", "ok_value": 0},
+        {"tag": "INVERSION_OVER_TRAVEL", "name": "Inversion Over Travel", "picture": "over_travel", "place": "top", "ok_value": 0},
+        {"tag": "DOOR_SWITCH_RH", "name": "Door", "picture": "sensor", "place": "bottom", "ok_value": 0},
+        {"tag": "CURTAIN_REVERSED", "name": "Reversed", "picture": "sensor", "place": "top", "ok_value": 1},
     ]
 
 
@@ -100,15 +102,17 @@ def test_build_station_statuses(known_templates):
 def test_s3_status_1_is_not_ok(known_templates):
     from datetime import datetime
     s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": 1, "changed": datetime.now()},
-          "INVERSION_OVER_TRAVEL": {"value": 0, "changed": None}}
+          "INVERSION_OVER_TRAVEL": {"value": 0, "changed": None},
+          "CURTAIN_REVERSED": {"value": 0, "changed": None}}          # ok_value 1: 0 is NOT OK
     st = line2.build_station(7, {}, {}, s3)
-    assert [c["status"] for c in st["s3"]] == ["NOT OK", "OK", "PENDING"] and st["status"] == "red"
+    assert [c["status"] for c in st["s3"]] == ["NOT OK", "OK", "PENDING", "NOT OK"] and st["status"] == "red"
+    s3["CURTAIN_REVERSED"]["value"] = 1
     assert st["s3"][0]["since"].count(":") == 2
     s3["INVERSION_LIGHT_CURTAIN_LH"]["value"] = 0
     s3["DOOR_SWITCH_RH"] = {"value": 0, "changed": None}
     assert line2.build_station(7, {}, {}, s3)["status"] == "green"
     summary = line2._summary([line2.build_station(7, {}, {}, s3)])[0]
-    assert (summary["ok"], summary["total"]) == (3, 3)
+    assert (summary["l3_total"], summary["s3_ok"], summary["s3_total"]) == (0, 4, 4)
 
 
 def test_fetch_tables_reads_both_tables():

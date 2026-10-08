@@ -231,13 +231,15 @@ def station_template(station_id):
 
 
 _template_cache = {}  # template file -> (mtime, config)
-S3_PICTURES = ("light_curtain", "over_travel", "sensor")  # drawings in static/s3.js
+S3_PICTURES = ("area_scanner", "light_curtain", "over_travel", "sensor")  # drawings in static/s3.js
 
 
 def _s3_picture(tag, picture):
     if picture in S3_PICTURES:
         return picture
     tag = tag.upper()
+    if "SCANNER" in tag:
+        return "area_scanner"
     if "LIGHT_CURTAIN" in tag:
         return "light_curtain"
     if "OVER_TRAVEL" in tag or "OVERTRAVEL" in tag:

@@ -494,6 +494,22 @@ button.home-button { border: 0; }
 .lc-studs i { width: 5px; background: #1d232b; border-radius: 0 0 2px 2px; }
 .s3-layer-bottom .lc-studs i { border-radius: 2px 2px 0 0; }
 
+/* area scanner: label and device in the middle of the row, scan head facing the chassis.
+   The element is as wide as a curtain bar, so its beams cover the same stretch of chassis. */
+.s3-scanner { width: 58%; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.s3-layer-bottom .s3-scanner { flex-direction: column-reverse; }
+.sc { height: 58px; width: auto; overflow: visible; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3)); }
+.s3-layer-top .sc { transform: rotate(180deg); }          /* above the chassis: head down */
+.sc-cap { fill: #1f2328; }
+.sc-cone { fill: #2b3036; stroke: #15181c; stroke-width: 1; }
+.sc-head { fill: #121417; }
+.sc-scanline { fill: var(--s3c); }
+.sc-neck, .sc-plate { fill: #22262b; }
+.sc-body { fill: #f5c400; stroke: #3b3b3b; stroke-width: 1.5; }
+.sc-display { fill: #1d232b; }
+.sc-led { fill: var(--s3c); }
+.s3-bad .sc-led, .s3-bad .sc-scanline { animation: blink-box 0.6s infinite; }
+
 /* beams onto the chassis */
 .s3-rays { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; overflow: visible; }
 .s3-rays .ray-ok { stroke: var(--green); stroke-width: 1.5; opacity: 0.45; }
@@ -592,6 +608,11 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
 .portrait .s3-switch { bottom: auto; flex-direction: column-reverse; align-items: flex-end; }
 .portrait .s3-switch .ls { height: 100px; }
 .portrait .s3-layer-bottom .s3-switch { right: auto; left: 0; align-items: flex-start; }
+
+.portrait .s3-scanner { width: auto; height: 62%; flex-direction: row-reverse; align-items: center; gap: 0.4rem; }
+.portrait .s3-layer-bottom .s3-scanner { flex-direction: row; }
+.portrait .s3-layer-top .sc { transform: rotate(-90deg); }      /* right of the chassis: head left */
+.portrait .s3-layer-bottom .sc { transform: rotate(90deg); }    /* left of the chassis: head right */
 
 /* home page on a portrait screen: line photo on top, station buttons below */
 .portrait .home-hero { flex-direction: column; justify-content: flex-end; padding: 2% 3% calc(var(--footer-h) + 2%); }

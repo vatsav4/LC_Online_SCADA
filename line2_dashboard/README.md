@@ -22,7 +22,7 @@ table yet. A wrench whose **Set Count is 0** (not used for the vehicle model now
 counted; it still appears while a manager edits positions. The bypass state is not shown for now.
 
 An S3 control is **green** when its tag is 0 (OK) and **red** when it is 1 (NOT OK) - reversed for controls with
-`"ok_value": 1`, like the inversion light curtains -, with the time it last changed.
+`"ok_value": 1`, like the inversion area scanners (WinCC tags `Inversion_Light_Curtain_LH/RH`) -, with the time it last changed.
 If `S3_Controls_Data` doesn't exist yet, the S3 cards show NO DATA and the torques keep working.
 A station's home tile shows its L3 (torque wrench) and S3 counts separately, e.g. `L3 2/3` and `S3 3/3`; the tile is
 green only when both are all OK.
@@ -37,7 +37,7 @@ templates/login.html         manager login page
 templates/station_base.html  shared look of all station pages
 templates/base.html, index.html
 static/station.js            draws circles, boxes and lines; refreshes every 2 s
-static/s3.js                 S3 Controls panel and its drawings (light curtain, over-travel switch)
+static/s3.js                 S3 devices drawn around the chassis (area scanner, light curtain, over-travel switch)
 static/chassis/              chassis pictures, one per stage (IMG_1..IMG_5.jpg)
 static/Background.jpg        line photo behind the home page's station buttons
 static/logo.png              logo in the top bar
@@ -84,21 +84,27 @@ Add an `s3_controls` list to the station's template (see `station_7.html`):
 
 ```jinja
 {% set s3_controls = [
-    {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Light Curtain LH"},
+    {"tag": "Inversion_Light_Curtain_LH", "name": "Inversion Area Scanner LH", "picture": "area_scanner"},
     {"tag": "Inversion_Over_Travel", "name": "Inversion Over Travel"},
 ] %}
 ```
 
 - **`tag`:** the WinCC tag name, as logged in `S3_Controls_Data.Tag_Name` (also add it to the `CONTROLS` list in
   `wincc/S3_Controls_To_SQL_Action.vbs`).
-- **`picture`** (optional): `"light_curtain"`, `"over_travel"` or `"sensor"`. Left out, it's chosen from the tag name.
-- **`ok_value`** (optional): the tag value that means OK. Left out it's `0` (0 green, 1 red). The inversion light
-  curtains use `1` (1 green, 0 red).
+- **`picture`** (optional): `"area_scanner"`, `"light_curtain"`, `"over_travel"` or `"sensor"`. Left out, it's chosen
+  from the tag name.
+- **`ok_value`** (optional): the tag value that means OK. Left out it's `0` (0 green, 1 red). The inversion area
+  scanners use `1` (1 green, 0 red).
 - **`place`** (optional): `"top"` (above the chassis) or `"bottom"` (below). Left out, tags ending in `RH` go below.
 
-The devices are drawn in the rows above and below the chassis: a light curtain as a bar whose beams shine onto the
-chassis (faint green when OK, flashing red when NOT OK), the over-travel limit switch at the right-hand end of its row
-(red light bursts out of it and the lever is tripped when NOT OK). Because they use those rows, a station with S3
+The devices are drawn in the rows above and below the chassis:
+
+- **Area scanner** (Station 7's inversion scanners): head facing the chassis, a fan of beams onto it.
+- **Light curtain:** a bar whose beams shine straight onto the chassis.
+- **Over-travel limit switch:** at the right-hand end of its row; red light bursts out of it and the lever is tripped
+  when NOT OK.
+
+Beams are faint green when OK and flashing red when NOT OK. Because the devices use those rows, a station with S3
 devices shouldn't also have torque wrenches there.
 
 Every station's chassis is drawn at the same height: the height at which the widest picture (`IMG_1.jpg`, set as

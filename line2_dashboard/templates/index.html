@@ -7,6 +7,8 @@
 {% block content %}
 <!-- Home page: the line photo (static/Background.jpg) with the station panel on the right. -->
 <section class="home-hero" style="background-image: url('{{ url_for('static', filename='Background.jpg') }}')">
+  <!-- S1 / S2 / S3 slide over the free part of the photo (left in landscape, top right in portrait) -->
+  <img class="home-meanings" src="{{ url_for('static', filename='Meanings.png') }}" alt="S1, S2 &amp; S3 Level of Control">
   <aside class="home-panel">
     <div class="home-panel-title">Station Status</div>
     <div class="home-summary" id="home-summary">

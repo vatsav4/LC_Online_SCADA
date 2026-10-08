@@ -43,7 +43,7 @@
       if (p !== root.classList.contains("portrait")) root.classList.toggle("portrait", p);
       // portrait: the box columns take a quarter of the width (200-290 px each), so the upright
       // chassis keeps its room also with Windows display scaling (125 %, 150 %)
-      var n = p && window.viewW() < 800;      // narrow portrait page (e.g. 1080 px screen at 150 % scaling)
+      var n = p && window.viewW() < 1000;     // narrow portrait page (1080 px screen at 125 % / 150 % scaling)
       if (n !== root.classList.contains("narrow")) root.classList.toggle("narrow", n);
       if (p) root.style.setProperty("--box-w", Math.round(Math.max(200, Math.min(290, window.viewW() * 0.25))) + "px");
       else root.style.removeProperty("--box-w");
@@ -74,6 +74,10 @@
            onerror="this.style.display='none'">
     </a>
     <div class="center-title">{% block center_title %}{% endblock %}</div>
+    <!-- S1 / S2 / S3 level-of-control slide (static/Meanings.png) on every page; click to see it large -->
+    <button type="button" class="meanings-thumb" id="meanings-open" title="S1, S2 &amp; S3 Level of Control - click to enlarge">
+      <img src="{{ url_for('static', filename='Meanings.png') }}" alt="S1, S2 &amp; S3 Level of Control">
+    </button>
     <div class="right-title">
       {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
       {% if user %}
@@ -100,7 +104,19 @@
     </span>
   </footer>
 
+  <div class="meanings-overlay" id="meanings-overlay" hidden title="Click to close">
+    <img src="{{ url_for('static', filename='Meanings.png') }}" alt="S1, S2 &amp; S3 Level of Control">
+  </div>
+
   <script>
+    // S1 / S2 / S3 slide: thumbnail in the top bar opens it large; click or Esc closes it
+    (function () {
+      const overlay = document.getElementById("meanings-overlay");
+      document.getElementById("meanings-open").addEventListener("click", () => { overlay.hidden = false; });
+      overlay.addEventListener("click", () => { overlay.hidden = true; });
+      document.addEventListener("keydown", e => { if (e.key === "Escape") overlay.hidden = true; });
+    })();
+
     // Use the real top bar / footer heights (they differ with screen scaling and fonts).
     (function () {
       function measureBars() {

@@ -625,9 +625,39 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
 .portrait .s3-layer-top .sc { transform: rotate(-90deg); }      /* right of the chassis: head left */
 .portrait .s3-layer-bottom .sc { transform: rotate(90deg); }    /* left of the chassis: head right */
 
-/* home page on a portrait screen: line photo on top, station buttons below */
-.portrait .home-hero { flex-direction: column; justify-content: flex-end; padding: 2% 3% calc(var(--footer-h) + 2%); }
-.portrait .home-panel { width: 100%; height: 58%; }
+/* home page on a portrait screen: the whole line photo across the top, station panel below it */
+.portrait .home-hero {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0 3% calc(var(--footer-h) + 1.5%);
+  background-color: var(--navy);
+  background-size: 100% auto;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+/* Background.jpg is 2:1, so it is half the page width high; the panel starts just above its bottom
+   edge (vertical % margins are taken from the width; the content box is 94 % of it) */
+.portrait .home-panel { width: 100%; height: auto; flex: 1; margin-top: 49%; min-height: 0; }
+.portrait .station-grid { gap: 0.6rem; }
+
+/* narrower boxes on a portrait screen */
+.portrait .tool-box { padding: 0.35rem 0.7rem 0.4rem; }
+.portrait .tool-title { font-size: 0.95rem; }
+.portrait .tool-row { font-size: 0.9rem; }
+.portrait .nut { font-size: 0.8rem; }
+
+/* narrow portrait page: compact top bar and plate row */
+.narrow .topbar { gap: 0.8rem; padding: 0.15rem 0.8rem; }
+.narrow .brand-logo { height: 42px; }
+.narrow .center-title { font-size: 1.05rem; }
+.narrow .status-ribbon { font-size: 0.66rem; margin-left: 0.5rem; padding: 0.15rem 0.6rem; }
+.narrow .login-link { font-size: 0.75rem; padding: 0.3rem 0.6rem; }
+.narrow .station-top { gap: 0.5rem; }
+.narrow .plates { gap: 0.6rem; }
+.narrow .plate, .narrow .plate-wide { min-width: 0; padding: 0.1rem 0.8rem 0.2rem; }
+.narrow .plate-value { font-size: 1.05rem; }
+.narrow .home-button, .narrow .nav-button { padding: 0.4rem 0.7rem; font-size: 0.8rem; white-space: nowrap; }
+.narrow .station-nav { gap: 0.3rem; }
 
 /* /display-check */
 .display-check { max-width: 760px; }

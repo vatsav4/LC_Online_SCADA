@@ -142,7 +142,8 @@
     // Portrait: the chassis is turned 90 degrees (front at the top) between two columns of boxes.
     // The slot is as wide as the chassis is "high", and long enough for the widest picture.
     const aspect = img.naturalWidth / img.naturalHeight;
-    const boxW = 2 * (parseFloat(css.getPropertyValue("--box-w")) || 290);   // one column of boxes each side
+    // one column of boxes each side (--box-w is set in px by base.html for portrait screens)
+    const boxW = 2 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--box-w")) || 290);
     const gap = parseFloat(cs.columnGap) || 0;
     const place = short => {
       short = Math.max(60, Math.floor(short));

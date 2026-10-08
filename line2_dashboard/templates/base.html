@@ -41,6 +41,12 @@
     function orient() {
       var p = window.viewW() < window.viewH();
       if (p !== root.classList.contains("portrait")) root.classList.toggle("portrait", p);
+      // portrait: the box columns take a quarter of the width (200-290 px each), so the upright
+      // chassis keeps its room also with Windows display scaling (125 %, 150 %)
+      var n = p && window.viewW() < 800;      // narrow portrait page (e.g. 1080 px screen at 150 % scaling)
+      if (n !== root.classList.contains("narrow")) root.classList.toggle("narrow", n);
+      if (p) root.style.setProperty("--box-w", Math.round(Math.max(200, Math.min(290, window.viewW() * 0.25))) + "px");
+      else root.style.removeProperty("--box-w");
     }
     orient();
     window.addEventListener("resize", orient);

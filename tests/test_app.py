@@ -93,10 +93,24 @@ def test_build_station_statuses(known_templates):
     st = line2.build_station(5, mapping, torques)
     assert (st["vc_number"], st["mat_number"], st["status"]) == ("VC5", "MAT5", "red")
     t18, t23 = st["tools"]
-    assert (t18["status"], t18["mode"], t18["label"]) == ("OK", "BYPASS", "ARB bolt fitment")  # name from template
+    assert (t18["status"], t18["label"]) == ("OK", "ARB bolt fitment")  # name from template
+    assert "mode" not in t18   # bypass is not shown anywhere for now
     assert t23["status"] == "NOT OK"
     assert line2.build_station(5, mapping, {})["tools"][0]["status"] == "PENDING"
     assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no template, nothing to check
+
+
+def test_set_count_zero_hides_the_wrench(known_templates):
+    torques = {"T18": {"name": "", "set": 0, "actual": 0, "bypass": False},     # not used for this model
+               "T23": {"name": "", "set": 4, "actual": 4, "bypass": False}}
+    st = line2.build_station(5, {}, torques)
+    assert [t["hidden"] for t in st["tools"]] == [True, False] and st["status"] == "green"
+    summary = line2._summary([st])[0]
+    assert (summary["l3_ok"], summary["l3_total"], summary["l3_skipped"]) == (1, 1, 1)
+    torques["T23"]["set"] = 0
+    st = line2.build_station(5, {}, torques)
+    assert st["status"] == "idle" and line2._summary([st])[0]["l3_total"] == 0
+    assert not line2.build_station(5, {}, {})["tools"][0]["hidden"]   # no data yet: shown as awaiting
 
 
 def test_s3_status_1_is_not_ok(known_templates):
@@ -163,6 +177,9 @@ def test_pages_and_api(client):
     st7 = client.get("/api/station/7").get_json()
     assert len(st7["s3"]) == 3 and "s3-rays" in client.get("/station/7").get_data(as_text=True)
     assert client.get("/station/18").status_code == 404
+    assert "BYPASS" not in client.get("/station/10").get_data(as_text=True)
+    assert "User-Agent" not in client.get("/display-check").get_data(as_text=True)
+    assert client.get("/display-check").status_code == 200
     home = client.get("/").get_data(as_text=True)
     assert "Background.jpg" in home and ">STN - 17<" in home
 

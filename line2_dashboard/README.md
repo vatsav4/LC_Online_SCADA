@@ -18,7 +18,8 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
-table yet. Bypassed wrenches get a BYPASS badge and an amber rim on the circle.
+table yet. A wrench whose **Set Count is 0** (not used for the vehicle model now at the station) is not shown and not
+counted; it still appears while a manager edits positions. The bypass state is not shown for now.
 
 An S3 control is **green** when its tag is 0 (OK) and **red** when it is 1 (NOT OK) - reversed for controls with
 `"ok_value": 1`, like the inversion light curtains -, with the time it last changed.
@@ -113,6 +114,23 @@ Every station's chassis is drawn at the same height: the height at which the wid
 Save writes the new `x` / `y` straight into `templates/station_<n>.html` and adds a "positions last saved … by …" line.
 Wrench numbers, the picture and comments stay as they are. The previous version is kept as `station_<n>.html.bak`.
 Viewing the dashboard needs no login.
+
+## Digital standee / portrait screens
+
+On a screen that is taller than wide, the station pages stand the chassis upright (front at the top) with the boxes
+in a column on each side. The home page puts the station buttons under the line photo.
+
+1. On the standee's browser open `http://<dashboard-pc>:5001/display-check`. It shows the browser version and the
+   page size the dashboard sees.
+2. If the dashboard appears sideways (the standee's picture can't be rotated in its own settings), press
+   **Turn left (270)** or **Turn right (90)** on that page until it's upright. The choice is remembered on that
+   screen; **No turning** switches it off. The same works by adding `?rotate=270`, `?rotate=90` or `?rotate=0` to
+   any dashboard address.
+3. Open the station the standee should show, e.g. `http://<dashboard-pc>:5001/station/1`, and put the browser in
+   full screen / kiosk mode.
+
+Unattended screens reload themselves when the dashboard is restarted (e.g. after an update), and keep retrying
+while the PC or network is down. Set Count 0 wrenches and the bypass state are not shown on any screen.
 
 ## Run
 

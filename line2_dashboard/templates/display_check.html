@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Display check{% endblock %}
+{% block center_title %}Display check{% endblock %}
+
+{% block content %}
+<!-- Open http://<dashboard-pc>:5001/display-check on a new screen (e.g. the digital standee). -->
+<section class="login-card display-check">
+  <h2>This screen</h2>
+  <table>
+    <tr><th>Browser</th><td id="dc-ua"></td></tr>
+    <tr><th>Screen</th><td id="dc-screen"></td></tr>
+    <tr><th>Page size</th><td id="dc-page"></td></tr>
+    <tr><th>Rotation</th><td id="dc-rot"></td></tr>
+    <tr><th>Layout</th><td id="dc-layout"></td></tr>
+  </table>
+  <p>If the dashboard shows sideways, try the buttons (the choice is remembered on this screen):</p>
+  <div class="dc-buttons">
+    <a class="home-button" data-reload href="/display-check?rotate=270">Turn left (270)</a>
+    <a class="home-button" data-reload href="/display-check?rotate=90">Turn right (90)</a>
+    <a class="nav-button" data-reload href="/display-check?rotate=0">No turning</a>
+  </div>
+  <p><a data-reload href="/">Open the dashboard &rarr;</a></p>
+</section>
+<script>
+  (function () {
+    const set = (id, v) => { document.getElementById(id).textContent = v; };
+    set("dc-ua", navigator.userAgent);
+    set("dc-screen", `${screen.width} x ${screen.height} (pixel ratio ${window.devicePixelRatio})`);
+    set("dc-page", `${Math.round(window.viewW())} x ${Math.round(window.viewH())}`);
+    set("dc-rot", window.ROTATION ? `turned ${window.ROTATION}°` : "not turned");
+    set("dc-layout", document.documentElement.classList.contains("portrait") ? "portrait (chassis upright)" : "landscape");
+  })();
+</script>
+{% endblock %}

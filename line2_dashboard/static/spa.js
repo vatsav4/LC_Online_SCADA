@@ -32,7 +32,9 @@
     const newContent = doc.querySelector(".content");
     if (!newContent) return false;
 
-    document.querySelector(".content").innerHTML = newContent.innerHTML;
+    const content = document.querySelector(".content");
+    content.innerHTML = newContent.innerHTML;
+    content.className = newContent.className;
 
     const newCenter = doc.querySelector(".center-title");
     const newRight = doc.querySelector(".right-title");
@@ -72,7 +74,7 @@
     const link = e.target.closest("a");
     if (!link || !link.href) return;
     if (link.target && link.target !== "_self") return;
-    if (link.hasAttribute("download")) return;
+    if (link.hasAttribute("download") || link.hasAttribute("data-reload")) return;
     if (link.origin !== window.location.origin) return;
 
     e.preventDefault();

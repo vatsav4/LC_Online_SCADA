@@ -2,6 +2,8 @@
 {% block title %}All Stations{% endblock %}
 {% block center_title %}LCV & ICV Assembly Line - L3 & S3 Controls Dashboard{% endblock %}
 
+{% block content_class %}content-home{% endblock %}
+
 {% block content %}
 <!-- Home page: the line photo (static/Background.jpg) with the station panel on the right. -->
 <section class="home-hero" style="background-image: url('{{ url_for('static', filename='Background.jpg') }}')">
@@ -24,9 +26,9 @@
          href="{{ url_for('station', station_id=st.id) }}" title="Station {{ st.id }}">
         <span class="tile-name">STN - {{ st.id }}</span>
         <span class="tile-counts">
-          {% if st.l3_total %}<span class="tile-count" data-kind="l3">L3 {{ st.l3_ok }}/{{ st.l3_total }}</span>{% endif %}
-          {% if st.s3_total %}<span class="tile-count" data-kind="s3">S3 {{ st.s3_ok }}/{{ st.s3_total }}</span>{% endif %}
-          {% if not st.l3_total and not st.s3_total %}<span class="tile-count">not set up</span>{% endif %}
+          <span class="tile-count" data-kind="l3"{% if not st.l3_total %} hidden{% endif %}>L3 {{ st.l3_ok }}/{{ st.l3_total }}</span>
+          <span class="tile-count" data-kind="s3"{% if not st.s3_total %} hidden{% endif %}>S3 {{ st.s3_ok }}/{{ st.s3_total }}</span>
+          <span class="tile-count" data-kind="none"{% if st.l3_total or st.s3_total %} hidden{% endif %}>{{ 'no L3 needed' if st.l3_skipped else 'not set up' }}</span>
         </span>
       </a>
       {% endfor %}

@@ -58,10 +58,13 @@
 <section class="station-view" id="station-view">
   <div class="callouts callouts-top" id="callouts-top"></div>
   {% if st.s3 %}<div class="s3-layer s3-layer-top" id="s3-top"></div>{% endif %}
-  <div class="chassis-box" id="chassis-box">
-    <img id="chassis-img" alt="Chassis" draggable="false"
-         src="{{ url_for('static', filename='chassis/' ~ st.image) }}">
-    <div class="markers" id="markers"></div>
+  <!-- the slot keeps the chassis' place; on a portrait screen the chassis inside it stands upright -->
+  <div class="chassis-slot" id="chassis-slot">
+    <div class="chassis-box" id="chassis-box">
+      <img id="chassis-img" alt="Chassis" draggable="false"
+           src="{{ url_for('static', filename='chassis/' ~ st.image) }}">
+      <div class="markers" id="markers"></div>
+    </div>
   </div>
   <div class="callouts callouts-bottom" id="callouts-bottom"></div>
   {% if st.s3 %}<div class="s3-layer s3-layer-bottom" id="s3-bottom"></div>

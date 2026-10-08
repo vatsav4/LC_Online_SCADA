@@ -9,7 +9,8 @@
 // layout changes. A device is only redrawn when its status changes, so animations run smoothly.
 (function () {
   const $ = id => document.getElementById(id);
-  const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  const R = el => (window.logicalRect ? window.logicalRect(el) : el.getBoundingClientRect());
+  const esc = v => String(v === null || v === undefined ? "" : v).replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const cls = s => (s === "OK" ? "ok" : s === "NOT OK" ? "bad" : "pending");
   const LABEL = { ok: "OK", bad: "NOT OK", pending: "NO DATA" };
@@ -84,36 +85,52 @@
     window.drawS3Rays();
   };
 
-  // Light-curtain beams: from each stud of the bar onto the chassis picture.
+  // Light-curtain beams: from each stud of the bar onto the chassis picture. On a portrait screen
+  // the curtains stand to the right ("top") / left ("bottom") of the upright chassis and shine sideways.
   let lastRays = "";
   window.drawS3Rays = function () {
     const svg = $("s3-rays"), view = $("station-view"), img = $("chassis-img");
     if (!svg || !view || !img) return;
-    const vr = view.getBoundingClientRect(), ir = img.getBoundingClientRect();
+    const vr = R(view), ir = R(img);
+    const upright = document.documentElement.classList.contains("portrait");
+    const p = n => Math.round(n * 10) / 10;
     const parts = [];
     view.querySelectorAll(".s3-curtain").forEach(dev => {
       const s = dev.getAttribute("data-status");
       if (s === "pending") return;
       const top = dev.parentElement.id === "s3-top";
       const reach = s === "bad" ? 0.42 : 0.1;                  // how far into the picture the light goes
-      const yEnd = top ? ir.top + ir.height * reach : ir.bottom - ir.height * reach;
-      const studs = [...dev.querySelectorAll(".lc-studs i")].map(i => i.getBoundingClientRect());
+      const studs = [...dev.querySelectorAll(".lc-studs i")].map(R);
       if (!studs.length) return;
-      const y0 = top ? studs[0].bottom : studs[0].top;
-      const x0 = studs[0].left, x1 = studs[studs.length - 1].right;
-      const p = n => Math.round(n * 10) / 10;
-      parts.push(`<polygon class="sheet" fill="url(#s3-${top ? "down" : "up"}-${s})" points="${p(x0 - vr.left)},${p(y0 - vr.top)} ` +
-                 `${p(x1 - vr.left)},${p(y0 - vr.top)} ${p(x1 - vr.left + 14)},${p(yEnd - vr.top)} ${p(x0 - vr.left - 14)},${p(yEnd - vr.top)}"/>`);
+      // work along / across the bar, then swap x and y for an upright chassis
+      let a0, a1, b0, bEnd, dir, at;
+      if (!upright) {
+        a0 = studs[0].left - vr.left; a1 = studs[studs.length - 1].right - vr.left;
+        b0 = (top ? studs[0].bottom : studs[0].top) - vr.top;
+        bEnd = (top ? ir.top + ir.height * reach : ir.bottom - ir.height * reach) - vr.top;
+        dir = top ? "down" : "up";
+        at = r => r.left + r.width / 2 - vr.left;
+      } else {
+        a0 = studs[0].top - vr.top; a1 = studs[studs.length - 1].bottom - vr.top;
+        b0 = (top ? studs[0].left : studs[0].right) - vr.left;
+        bEnd = (top ? ir.right - ir.width * reach : ir.left + ir.width * reach) - vr.left;
+        dir = top ? "left" : "right";
+        at = r => r.top + r.height / 2 - vr.top;
+      }
+      const pt = (a, b) => (upright ? `${p(b)},${p(a)}` : `${p(a)},${p(b)}`);
+      parts.push(`<polygon class="sheet" fill="url(#s3-${dir}-${s})" points="${pt(a0, b0)} ${pt(a1, b0)} ${pt(a1 + 14, bEnd)} ${pt(a0 - 14, bEnd)}"/>`);
       studs.forEach(r => {
-        const x = p(r.left + r.width / 2 - vr.left);
-        parts.push(`<line class="ray ray-${s}" x1="${x}" y1="${p(y0 - vr.top)}" x2="${x}" y2="${p(yEnd - vr.top)}"/>`);
+        const [x1, y1] = pt(at(r), b0).split(","), [x2, y2] = pt(at(r), bEnd).split(",");
+        parts.push(`<line class="ray ray-${s}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
       });
     });
     // light fades out away from the bar
-    const grad = (id, color, down) => `<linearGradient id="${id}" x1="0" y1="${down ? 0 : 1}" x2="0" y2="${down ? 1 : 0}">` +
-      `<stop offset="0" stop-color="${color}" stop-opacity="0.45"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient>`;
-    const markup = `<defs>${grad("s3-down-bad", "#ff2b2b", true)}${grad("s3-up-bad", "#ff2b2b", false)}` +
-      `${grad("s3-down-ok", "#2fb350", true)}${grad("s3-up-ok", "#2fb350", false)}</defs>${parts.join("")}`;
+    const DIRS = { down: [0, 0, 0, 1], up: [0, 1, 0, 0], right: [0, 0, 1, 0], left: [1, 0, 0, 0] };
+    const grad = (dir, s, color) => { const [x1, y1, x2, y2] = DIRS[dir];
+      return `<linearGradient id="s3-${dir}-${s}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">` +
+        `<stop offset="0" stop-color="${color}" stop-opacity="0.45"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient>`; };
+    const markup = "<defs>" + Object.keys(DIRS).map(d => grad(d, "bad", "#ff2b2b") + grad(d, "ok", "#2fb350")).join("") +
+      "</defs>" + parts.join("");
     svg.setAttribute("width", vr.width);
     svg.setAttribute("height", vr.height);
     if (markup !== lastRays) { svg.innerHTML = markup; lastRays = markup; }  // unchanged: keep animations running

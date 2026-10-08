@@ -80,6 +80,9 @@ DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", 
 SECRET_KEY = _get("MAIN", "secret_key", "").strip() or secrets.token_hex(32)
 # username = password hash (from: python app.py hash-password)
 MANAGERS = dict(_cfg["MANAGERS"]) if _cfg.has_section("MANAGERS") else {}
+# Changes at every start: pages that see a new value reload themselves, so unattended
+# screens (the digital standee) pick up an updated dashboard without anyone touching them.
+APP_VERSION = str(int(time.time()))
 
 # ================= LOGGING =================
 
@@ -169,7 +172,8 @@ def demo_tables():
                "T19": ("Axle brake hose", 1, 8, 0), "T23": ("Front/rear ARB", 4, 0, 0),
                "T26": ("Brake hose adapter", 2, 2, 1), "T37": ("Steering return line", 2, 10, 0),
                "T38": ("Urea tank fitment", 6, 6, 1), "T39": ("EGP clamp bolt", 2, 11, 1),
-               "T40": ("Air tank bracket", 4, 10, 1)}
+               "T40": ("Air tank bracket", 4, 10, 1),
+               "T4": ("Not used on this model", 0, 0, 0)}   # Set Count 0: hidden on station 2
     since = datetime.now().replace(microsecond=0)
     # light curtains: 1 = OK (ok_value 1 in station_7.html); LH trips now and then
     s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": int(tick % 5 != 0), "changed": since},
@@ -318,12 +322,15 @@ def build_station(station_id, mapping, torques, s3=None):
         else:
             status = "OK" if row["actual"] >= row["set"] else "NOT OK"
         tools.append({
+            # Set Count 0 = this wrench isn't used for the vehicle model now at the station:
+            # not shown and not counted (the station page still lists it while a manager edits positions)
+            "hidden": row is not None and row["set"] == 0,
             "tag": t["t_no"],
             "label": t["name"] or t["t_no"],  # name typed in the station template
             "x": t["x"], "y": t["y"],
             "set": (row or {}).get("set"),
             "actual": (row or {}).get("actual"),
-            "mode": "BYPASS" if (row or {}).get("bypass") else ("ACTIVE" if row else ""),
+            # bypass state is still read from SQL (Active_Bypass) but not shown for now
             "status": status,
         })
     controls = []
@@ -332,7 +339,7 @@ def build_station(station_id, mapping, torques, s3=None):
         value = row.get("value")
         controls.append({**c, "status": "PENDING" if value is None else ("OK" if value == c["ok_value"] else "NOT OK"),
                          "since": _since(row.get("changed"))})
-    checks = tools + controls
+    checks = [t for t in tools if not t["hidden"]] + controls
     return {
         "station": station_id,
         "vc_number": vehicle.get("vc", ""),
@@ -342,6 +349,7 @@ def build_station(station_id, mapping, torques, s3=None):
         "s3": controls,
         "error": config["error"],
         "status": "idle" if not checks else ("green" if all(t["status"] == "OK" for t in checks) else "red"),
+        "version": APP_VERSION,
     }
 
 
@@ -358,10 +366,14 @@ def _all_stations():
 
 def _summary(stations):
     """Home-page tiles: L3 (torque wrenches) and S3 controls, counted separately."""
-    return [{"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
-             "l3_ok": sum(t["status"] == "OK" for t in st["tools"]), "l3_total": len(st["tools"]),
-             "s3_ok": sum(c["status"] == "OK" for c in st["s3"]), "s3_total": len(st["s3"])}
-            for st in stations]
+    summary = []
+    for st in stations:
+        tools = [t for t in st["tools"] if not t["hidden"]]
+        summary.append({"id": st["station"], "status": st["status"], "mat_number": st["mat_number"],
+                        "l3_ok": sum(t["status"] == "OK" for t in tools), "l3_total": len(tools),
+                        "l3_skipped": len(st["tools"]) - len(tools),   # Set Count 0 for this vehicle
+                        "s3_ok": sum(c["status"] == "OK" for c in st["s3"]), "s3_total": len(st["s3"])})
+    return summary
 
 
 # ---------- manager login ----------
@@ -480,8 +492,15 @@ def api_save_positions(station_id):
 
 @app.context_processor
 def _globals():
-    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE,
+    return {"line_title": LINE_TITLE, "demo_mode": DEMO_MODE, "app_version": APP_VERSION,
             "user": current_user(), "csrf_token": csrf_token()}
+
+
+@app.route("/display-check")
+def display_check():
+    """Open this on a new screen (e.g. the digital standee) to see its browser and screen size,
+    and to switch the page rotation for that screen."""
+    return render_template("display_check.html", db_ok=state["db_ok"])
 
 
 @app.route("/")
@@ -505,7 +524,8 @@ def station(station_id):
 @app.route("/api/status")
 def api_status():
     stations, db_ok, updated_at = _all_stations()
-    return jsonify({"stations": _summary(stations), "db_ok": db_ok, "updated_at": updated_at})
+    return jsonify({"stations": _summary(stations), "db_ok": db_ok, "updated_at": updated_at,
+                    "version": APP_VERSION})
 
 
 @app.route("/api/station/<int:station_id>")

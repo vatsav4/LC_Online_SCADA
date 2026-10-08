@@ -18,9 +18,16 @@
         if (!el) return;
         el.classList.remove("tile-green", "tile-red", "tile-idle");
         el.classList.add("tile-" + st.status);
-        const l3 = el.querySelector('[data-kind="l3"]'), s3 = el.querySelector('[data-kind="s3"]');
-        if (l3) l3.textContent = `L3 ${st.l3_ok}/${st.l3_total}`;
-        if (s3) s3.textContent = `S3 ${st.s3_ok}/${st.s3_total}`;
+        // L3 / S3 counts; a wrench with Set Count 0 for this vehicle is left out by the server
+        const set = (kind, show, text) => {
+          const c = el.querySelector(`[data-kind="${kind}"]`);
+          if (!c) return;
+          c.hidden = !show;
+          c.textContent = text;
+        };
+        set("l3", st.l3_total > 0, `L3 ${st.l3_ok}/${st.l3_total}`);
+        set("s3", st.s3_total > 0, `S3 ${st.s3_ok}/${st.s3_total}`);
+        set("none", !st.l3_total && !st.s3_total, st.l3_skipped ? "no L3 needed" : "not set up");
       });
       const count = s => data.stations.filter(st => st.status === s).length;
       const sum = document.getElementById("home-summary");
@@ -30,6 +37,7 @@
         sum.querySelector(".sum-idle b").textContent = count("idle");
       }
       setConnection(data.db_ok, data.updated_at);
+      if (window.checkVersion) window.checkVersion(data.version);
     } catch (err) {
       setConnection(false);
       console.error("status refresh failed", err);

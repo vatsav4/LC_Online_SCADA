@@ -162,6 +162,12 @@ the chassis upright with the boxes in a column on each side; the home page puts 
    For start after every PC restart: Win+R, `shell:startup`, put a shortcut to the .bat file there.
 4. Keep the PC awake: **Settings > System > Power** - screen and sleep: **Never** (when plugged in).
 
+The level-of-control slides (`static/L3_Meaning.png`, `static/S3_Meaning.png`) are shown large on portrait screens:
+below the chassis on station pages (L3 for wrench / U-bolt / wheel stations, S3 for S3 controls, both in turn when a
+station has both or nothing), and between the photo and the station panel on the home page. On desktop screens the
+home page shows both side by side, and every page has the two as click-to-enlarge thumbnails in the top bar.
+To change a slide, replace the PNG file with one of the same name.
+
 The mouse pointer hides itself after 4 s without movement. Close the full-screen page with Alt+F4 (click on it first).
 
 If Windows can't rotate the standee screen (or the wireless HDMI set only mirrors the laptop's main screen): open

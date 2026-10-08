@@ -304,6 +304,8 @@
   }
 
   $("chassis-img").addEventListener("load", fitToScreen);
+  // portrait: the level-of-control slide below the chassis takes its height once loaded
+  document.querySelectorAll(".station-meanings img").forEach(i => i.addEventListener("load", fitToScreen));
   window.addEventListener("resize", fitToScreen);
   const observer = window.ResizeObserver ? new ResizeObserver(drawLeaders) : null;
   if (observer) observer.observe($("station-view"));

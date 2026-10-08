@@ -85,33 +85,48 @@ body {
   50% { opacity: 0.35; }
 }
 
-/* ---------- S1 / S2 / S3 level-of-control slide (static/Meanings.png) ---------- */
-/* thumbnail in the top bar, as high as the logo, so the bar keeps its height */
+/* ---------- L3 / S3 level-of-control slides (static/L3_Meaning.png, S3_Meaning.png) ---------- */
+/* thumbnails in the top bar, as high as the logo, so the bar keeps its height */
+.meanings-thumbs { display: flex; gap: 0.4rem; flex: none; }
 .meanings-thumb {
   flex: none; padding: 0; border: 2px solid rgba(216, 185, 106, 0.6); border-radius: 6px;
   background: #fff; cursor: zoom-in; line-height: 0; overflow: hidden;
 }
 .meanings-thumb img { height: 48px; width: auto; display: block; }
 .meanings-thumb:hover { border-color: var(--gold); }
-.narrow .meanings-thumb img { height: 38px; }
-/* the slide large over the page; click anywhere to close */
+.portrait .meanings-thumbs { display: none; }   /* portrait pages show the slides large instead */
+/* a slide large over the page; click anywhere to close */
 .meanings-overlay {
   position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
   background: rgba(8, 18, 34, 0.75); cursor: zoom-out;
 }
 .meanings-overlay img {
-  width: 90vw; max-width: 1100px; height: auto; max-height: 85vh; object-fit: contain;
+  width: 90vw; max-width: 1400px; height: auto; max-height: 88vh; object-fit: contain;
   background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
-html.rotated .meanings-overlay img { width: 90vh; max-height: 85vw; }   /* turned page: swap units */
-/* home page: shown full size over the free part of the line photo */
-.home-meanings {
-  position: absolute; left: 2.5%; bottom: calc(var(--footer-h) + 2.5vh);
-  width: 520px; width: clamp(360px, 30vw, 560px); height: auto;
-  border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); background: #fff;
+html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turned page: swap units */
+
+/* slides shown one at a time (cross-fade every 10 s, base.html) */
+.meaning-rotator { display: grid; }
+.meaning-rotator > img { grid-area: 1 / 1; opacity: 0; transition: opacity 0.8s ease; }
+.meaning-rotator > img.active { opacity: 1; }
+.meaning-rotator img { border-radius: 10px; background: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
+
+/* home page, landscape: both slides side by side over the free (left) part of the line photo */
+.home-meanings { position: absolute; left: 2.5%; bottom: calc(var(--footer-h) + 2.5vh); display: flex; gap: 1rem; }
+.home-meanings > img { opacity: 1; width: 600px; width: min(31vw, 680px); height: auto; }
+/* home page, portrait: one slide at a time, full width between the photo and the station panel */
+.portrait .home-meanings { position: static; display: grid; margin-top: 49%; }
+.portrait .home-meanings > img { width: 100%; opacity: 0; }
+.portrait .home-meanings > img.active { opacity: 1; }
+
+/* station pages, portrait (kiosk): slide below the chassis, a third of the page height at most */
+.station-meanings { display: none; }
+.portrait .station-meanings { display: grid; justify-content: center; margin: 0.6rem auto 0; }
+.portrait .station-meanings > img {
+  width: auto; height: auto; max-width: 100%; max-height: calc(var(--view-h, 1500px) * 0.33);
 }
-.portrait .home-meanings { left: auto; right: 3%; top: 1.5%; bottom: auto; width: 44%; }
 
 /* ---------- buttons ---------- */
 .page-toolbar {
@@ -667,9 +682,10 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
   background-position: center top;
   background-repeat: no-repeat;
 }
-/* Background.jpg is 2:1, so it is half the page width high; the panel starts just above its bottom
-   edge (vertical % margins are taken from the width; the content box is 94 % of it) */
-.portrait .home-panel { width: 100%; height: auto; flex: 1; margin-top: 49%; min-height: 0; }
+/* Background.jpg is 2:1, so it is half the page width high; the slides (.home-meanings) start just
+   above its bottom edge (vertical % margins are taken from the width; the content box is 94 % of it),
+   the station panel fills the rest */
+.portrait .home-panel { width: 100%; height: auto; flex: 1; margin-top: 0.8rem; min-height: 0; }
 .portrait .station-grid { gap: 0.6rem; }
 
 /* narrower boxes on a portrait screen */

@@ -45,6 +45,7 @@
       // chassis keeps its room also with Windows display scaling (125 %, 150 %)
       var n = p && window.viewW() < 1000;     // narrow portrait page (1080 px screen at 125 % / 150 % scaling)
       if (n !== root.classList.contains("narrow")) root.classList.toggle("narrow", n);
+      root.style.setProperty("--view-h", Math.round(window.viewH()) + "px");   // page height, also when turned
       if (p) root.style.setProperty("--box-w", Math.round(Math.max(200, Math.min(290, window.viewW() * 0.25))) + "px");
       else root.style.removeProperty("--box-w");
     }
@@ -74,10 +75,17 @@
            onerror="this.style.display='none'">
     </a>
     <div class="center-title">{% block center_title %}{% endblock %}</div>
-    <!-- S1 / S2 / S3 level-of-control slide (static/Meanings.png) on every page; click to see it large -->
-    <button type="button" class="meanings-thumb" id="meanings-open" title="S1, S2 &amp; S3 Level of Control - click to enlarge">
-      <img src="{{ url_for('static', filename='Meanings.png') }}" alt="S1, S2 &amp; S3 Level of Control">
-    </button>
+    <!-- L3 / S3 level-of-control slides (static/L3_Meaning.png, S3_Meaning.png); click to see one large -->
+    <div class="meanings-thumbs">
+      <button type="button" class="meanings-thumb" data-src="{{ url_for('static', filename='L3_Meaning.png') }}"
+              title="L1, L2 &amp; L3 Level of Control - click to enlarge">
+        <img src="{{ url_for('static', filename='L3_Meaning.png') }}" alt="L1, L2 &amp; L3 Level of Control">
+      </button>
+      <button type="button" class="meanings-thumb" data-src="{{ url_for('static', filename='S3_Meaning.png') }}"
+              title="S1, S2 &amp; S3 Level of Control - click to enlarge">
+        <img src="{{ url_for('static', filename='S3_Meaning.png') }}" alt="S1, S2 &amp; S3 Level of Control">
+      </button>
+    </div>
     <div class="right-title">
       {% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}
       {% if user %}
@@ -105,16 +113,29 @@
   </footer>
 
   <div class="meanings-overlay" id="meanings-overlay" hidden title="Click to close">
-    <img src="{{ url_for('static', filename='Meanings.png') }}" alt="S1, S2 &amp; S3 Level of Control">
+    <img id="meanings-overlay-img" alt="Level of Control">
   </div>
 
   <script>
-    // S1 / S2 / S3 slide: thumbnail in the top bar opens it large; click or Esc closes it
+    // L3 / S3 slides: a thumbnail in the top bar opens its slide large; click or Esc closes it.
+    // Pages with more than one slide in a .meaning-rotator show them in turn (every 10 s).
     (function () {
       const overlay = document.getElementById("meanings-overlay");
-      document.getElementById("meanings-open").addEventListener("click", () => { overlay.hidden = false; });
+      document.querySelectorAll(".meanings-thumb").forEach(b => b.addEventListener("click", () => {
+        document.getElementById("meanings-overlay-img").src = b.getAttribute("data-src");
+        overlay.hidden = false;
+      }));
       overlay.addEventListener("click", () => { overlay.hidden = true; });
       document.addEventListener("keydown", e => { if (e.key === "Escape") overlay.hidden = true; });
+      setInterval(() => {
+        document.querySelectorAll(".meaning-rotator").forEach(r => {
+          const imgs = r.querySelectorAll("img");
+          if (imgs.length < 2) return;
+          let i = [...imgs].findIndex(img => img.classList.contains("active"));
+          imgs.forEach(img => img.classList.remove("active"));
+          imgs[(i + 1) % imgs.length].classList.add("active");
+        });
+      }, 10000);
     })();
 
     // Use the real top bar / footer heights (they differ with screen scaling and fonts).

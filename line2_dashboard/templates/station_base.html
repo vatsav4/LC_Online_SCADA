@@ -79,6 +79,16 @@
 </section>
 
 
+{#- Portrait screens (kiosk): the level-of-control slide below the chassis - L3 for wrench / nut
+    stations, S3 for S3 controls, both in turn when a station has both or nothing. Hidden on desktops. #}
+{% set meanings = (['L3_Meaning.png'] if st.tools else []) + (['S3_Meaning.png'] if st.s3 else []) %}
+{% if not meanings %}{% set meanings = ['L3_Meaning.png', 'S3_Meaning.png'] %}{% endif %}
+<div class="meaning-rotator station-meanings">
+  {%- for m in meanings %}
+  <img{% if loop.first %} class="active"{% endif %} src="{{ url_for('static', filename=m) }}" alt="Level of Control">
+  {%- endfor %}
+</div>
+
 <script type="application/json" id="station-data">{{ st|tojson }}</script>
 {% endblock %}
 

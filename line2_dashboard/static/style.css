@@ -637,3 +637,6 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
 .dc-buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 /* vw / vh units still refer to the unturned screen, so give a turned page fixed side margins */
 html.rotated .content { padding-left: 1rem; padding-right: 1rem; }
+
+/* pointer hidden after a few seconds without mouse movement (base.html) */
+html.cursor-idle, html.cursor-idle * { cursor: none !important; }

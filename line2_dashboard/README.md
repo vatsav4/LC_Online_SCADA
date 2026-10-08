@@ -42,6 +42,7 @@ static/s3.js                 S3 devices drawn around the chassis (area scanner, 
 static/chassis/              chassis pictures, one per stage (IMG_1..IMG_5.jpg)
 static/Background.jpg        line photo behind the home page's station buttons
 static/logo.png              logo in the top bar
+standee/Start_Standee.bat    opens the dashboard full screen on the standee (PC with HDMI to the standee)
 wincc/                       the WinCC VBScripts that fill Torques_Actual_Data and S3_Controls_Data
 ```
 
@@ -136,22 +137,33 @@ Save writes the new `x` / `y` straight into `templates/station_<n>.html` and add
 Wrench numbers, the picture and comments stay as they are. The previous version is kept as `station_<n>.html.bak`.
 Viewing the dashboard needs no login.
 
-## Digital standee / portrait screens
+## Digital standee (picture from a PC over HDMI)
 
-On a screen that is taller than wide, the station pages stand the chassis upright (front at the top) with the boxes
-in a column on each side. The home page puts the station buttons under the line photo.
+The standee has no network of its own, so a PC (or laptop) runs the browser and sends its picture to the standee's
+HDMI input (here through a ViewSonic wireless HDMI set). On a screen that is taller than wide the station pages stand
+the chassis upright with the boxes in a column on each side; the home page puts the station buttons under the photo.
 
-1. On the standee's browser open `http://<dashboard-pc>:5001/display-check`. It shows the browser version and the
-   page size the dashboard sees.
-2. If the dashboard appears sideways (the standee's picture can't be rotated in its own settings), press
-   **Turn left (270)** or **Turn right (90)** on that page until it's upright. The choice is remembered on that
-   screen; **No turning** switches it off. The same works by adding `?rotate=270`, `?rotate=90` or `?rotate=0` to
-   any dashboard address.
-3. Open the station the standee should show, e.g. `http://<dashboard-pc>:5001/station/1`, and put the browser in
-   full screen / kiosk mode.
+1. **Connect** the wireless HDMI sender to the PC's HDMI port, the receiver to the standee. Windows sees the standee
+   as a second monitor.
+2. **Settings > System > Display** on the PC:
+   - "Multiple displays": **Extend these displays** (not Duplicate), so the laptop keeps its own screen.
+   - Select the standee screen, set **Display orientation: Portrait** (or *Portrait (flipped)* if it's upside down).
+     The picture now stands upright on the standee and the dashboard switches to the portrait layout by itself.
+   - Note the standee's position in the layout (usually right of the laptop screen, starting at x = 1920).
+3. Edit the two settings at the top of `standee/Start_Standee.bat` (page address, and `SCREEN_X` = where the
+   standee screen starts), then double-click it. Chrome (or Edge) opens the page full screen on the standee.
+   For start after every PC restart: Win+R, `shell:startup`, put a shortcut to the .bat file there.
+4. Keep the PC awake: **Settings > System > Power** - screen and sleep: **Never** (when plugged in).
+
+The mouse pointer hides itself after 4 s without movement. Close the full-screen page with Alt+F4 (click on it first).
+
+If Windows can't rotate the standee screen (or the wireless HDMI set only mirrors the laptop's main screen): open
+`http://<dashboard-pc>:5001/display-check` on that screen and press **Turn left (270)** or **Turn right (90)**; the
+page then turns itself. The same works with `?rotate=270` / `?rotate=90` (`?rotate=0` switches it off).
+With only one screen, mirroring turns the laptop's own view too, so a separate small PC for the standee is best.
 
 Unattended screens reload themselves when the dashboard is restarted (e.g. after an update), and keep retrying
-while the PC or network is down. Set Count 0 wrenches and the bypass state are not shown on any screen.
+while the PC or network is down.
 
 ## Run
 

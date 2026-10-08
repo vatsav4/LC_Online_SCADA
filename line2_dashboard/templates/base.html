@@ -47,6 +47,16 @@
     // a restarted (updated) dashboard reports a new version: reload to get the new pages
     window.APP_VERSION = root.getAttribute("data-version");
     window.checkVersion = function (v) { if (v && window.APP_VERSION && v !== window.APP_VERSION) location.reload(); };
+    // hide the mouse pointer after 4 s without movement (standee / kiosk screen); moving the mouse shows it again
+    var idle;
+    function wake() {
+      if (root.classList.contains("cursor-idle")) root.classList.remove("cursor-idle");
+      clearTimeout(idle);
+      idle = setTimeout(function () { root.classList.add("cursor-idle"); }, 4000);
+    }
+    document.addEventListener("mousemove", wake);
+    document.addEventListener("mousedown", wake);
+    wake();
   })();
 </script>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">

@@ -27,7 +27,7 @@
         };
         set("l3", st.l3_total > 0, `L3 ${st.l3_ok}/${st.l3_total}`);
         set("s3", st.s3_total > 0, `S3 ${st.s3_ok}/${st.s3_total}`);
-        set("none", !st.l3_total && !st.s3_total, st.l3_skipped ? "no L3 needed" : "not set up");
+        set("none", !st.l3_total && !st.s3_total, "not set up");   // also when every wrench has Set Count 0
       });
       const count = s => data.stations.filter(st => st.status === s).length;
       const sum = document.getElementById("home-summary");

@@ -28,7 +28,7 @@
         <span class="tile-counts">
           <span class="tile-count" data-kind="l3"{% if not st.l3_total %} hidden{% endif %}>L3 {{ st.l3_ok }}/{{ st.l3_total }}</span>
           <span class="tile-count" data-kind="s3"{% if not st.s3_total %} hidden{% endif %}>S3 {{ st.s3_ok }}/{{ st.s3_total }}</span>
-          <span class="tile-count" data-kind="none"{% if st.l3_total or st.s3_total %} hidden{% endif %}>{{ 'no L3 needed' if st.l3_skipped else 'not set up' }}</span>
+          <span class="tile-count" data-kind="none"{% if st.l3_total or st.s3_total %} hidden{% endif %}>not set up</span>
         </span>
       </a>
       {% endfor %}

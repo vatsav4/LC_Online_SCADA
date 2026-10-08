@@ -349,6 +349,10 @@ def _since(changed):
 
 _UBOLT = re.compile(r"^UBOLT_(LH|RH)_(FRONT|REAR)$")
 
+# TEMPORARY: LH_RF_IN_SET_TORQUE (LH front set torque) gives wrong values, so the LH front
+# box uses the RH front set torque instead. Delete this line once the LH tag is fixed.
+UBOLT_SET_FROM = {("LH", "FRONT"): ("RH", "FRONT")}
+
 
 def _ubolt_tool(t, side, end, ubolts, station_mat):
     """One U-bolt group (4 nuts) as a station box. A nut is OK when its actual torque >= the set
@@ -362,6 +366,9 @@ def _ubolt_tool(t, side, end, ubolts, station_mat):
     elif row["mat"].upper() != station_mat.upper():
         note = "other vehicle"
     set_value = None if note else row[end.lower() + "_set"]
+    if not note and (side, end) in UBOLT_SET_FROM:       # set torque taken from the other side
+        from_side, from_end = UBOLT_SET_FROM[(side, end)]
+        set_value = ((ubolts or {}).get(from_side) or {}).get(from_end.lower() + "_set")
     nuts = []
     for v in ([] if note else row[end.lower()]):
         state = "pending" if v is None or set_value is None else ("ok" if v >= set_value else "bad")

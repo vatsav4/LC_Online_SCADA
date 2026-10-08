@@ -158,6 +158,8 @@ def test_ubolt_groups_need_the_station_mat(known_templates):
     st = line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)
     lf, rr = st["tools"]
     assert (lf["short"], lf["status"], [n["state"] for n in lf["nuts"]]) == ("LF", "NOT OK", ["ok", "ok", "bad", "bad"])
+    ubolts["LH"]["front_set"] = 999                    # wrong LH front set torque: the RH front one is used
+    assert line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)["tools"][0]["set"] == 270
     assert (rr["short"], rr["label"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", "OK", 4)
     other = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]
     assert (other["status"], other["note"], other["nuts"]) == ("PENDING", "other vehicle", [])

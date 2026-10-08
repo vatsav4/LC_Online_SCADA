@@ -12,7 +12,8 @@
 '     Rear_1..4       <- LH_ACT_REAR_TORQUE_1..4
 '     Cycle_Complete  <- LH_CYCLE_COMPLETE
 '     Logged_At       =  SQL Server time of the last write
-' The torques are text tags like "+270.40"; they are stored as numbers.
+' The torques are text tags like "+270.40"; they are stored as numbers
+' (VBScript has no Val(), so the text is checked and written as it is).
 ' A row is inserted the first time a side is seen and updated afterwards.
 '
 ' Same safe pattern as Torques_To_SQL, with its OWN SQL connection.
@@ -79,43 +80,68 @@ Function action
     End If
 
     ' ---- 2. one IF EXISTS UPDATE / ELSE INSERT per changed side --------------------
-    Dim tg, good, txt, vals(9), matV, vcV, cycV, sig, oldSig, setPart, colList, valList, batch, changed, k
+    Dim tg, good, badTag, txt, vals(9), matV, vcV, cycV, sig, oldSig, setPart, colList, valList, batch, changed, k
+    Dim num, lastTrace
+    ' a torque text like "+270.40" / "-0.5" / "270" -> written to SQL as it is (minus a leading +).
+    ' (VBScript has no Val(); CDbl would depend on the Windows number format.)
+    Set num = New RegExp
+    num.Pattern = "^[+-]?[0-9]+(\.[0-9]+)?$"
     Set changed = CreateObject("Scripting.Dictionary")
     batch = ""
     For Each sd In SIDES
         ' Note: with On Error Resume Next, an error INSIDE an If condition jumps into
         ' the Then branch - so every check is computed first, then tested.
         good = True
+        badTag = ""
         For i = 0 To UBound(NUM_TAGS)
             Set tg = Nothing
             Err.Clear
             Set tg = ts(sd & NUM_TAGS(i))
             txt = ""
-            txt = Trim(CStr(tg.Value))
+            txt = Trim(Replace(CStr(tg.Value), Chr(0), ""))   ' PLC strings can carry NUL padding
             If Err.Number <> 0 Then good = False
             If tg Is Nothing Then good = False
             If good Then
                 If tg.QualityCode < &H80 Then good = False   ' &H80+ = good
             End If
+            If Not good And badTag = "" Then badTag = sd & NUM_TAGS(i)
             Err.Clear
-            ' "+270.40" -> 270.4 ; Val always reads "." as decimal point, the
-            ' Replace keeps "." in the SQL text whatever the Windows number format is
-            If txt = "" Then
-                vals(i) = "NULL"
+            If num.Test(txt) Then
+                If Left(txt, 1) = "+" Then txt = Mid(txt, 2)
+                vals(i) = txt
             Else
-                vals(i) = Replace(CStr(Val(txt)), ",", ".")
+                vals(i) = "NULL"                             ' empty or not a number
             End If
         Next
 
         matV = "" : vcV = "" : cycV = "NULL"
         Err.Clear
-        matV = Trim(CStr(ts(sd & "_MAT_NO_Str").Value))
-        vcV = Trim(CStr(ts(sd & "_VC_NO_Str_1").Value))
+        matV = Trim(Replace(CStr(ts(sd & "_MAT_NO_Str").Value), Chr(0), ""))
+        vcV = Trim(Replace(CStr(ts(sd & "_VC_NO_Str_1").Value), Chr(0), ""))
         If CBool(ts(sd & "_CYCLE_COMPLETE").Value) Then cycV = "1" Else cycV = "0"
-        If Err.Number <> 0 Then good = False
+        If Err.Number <> 0 Then
+            good = False
+            If badTag = "" Then badTag = sd & "_MAT_NO_Str / " & sd & "_VC_NO_Str_1 / " & sd & "_CYCLE_COMPLETE"
+        End If
         Err.Clear
         matV = Replace(matV, "'", "''")
         vcV = Replace(vcV, "'", "''")
+
+        ' say which tag stops this side from being logged (at most once a minute)
+        If Not good Then
+            lastTrace = 0
+            lastTrace = CDbl(HMIRuntime.DataSet("UB_LastTrace").Value)
+            Err.Clear
+            If nowS - lastTrace >= 60 Then
+                HMIRuntime.Trace "UBolt_To_SQL: " & sd & " not logged, tag not readable or bad quality: " & badTag & vbCrLf
+                Err.Clear
+                HMIRuntime.DataSet("UB_LastTrace").Value = nowS
+                If Err.Number <> 0 Then
+                    Err.Clear
+                    HMIRuntime.DataSet.Add "UB_LastTrace", nowS
+                End If
+            End If
+        End If
 
         If good Then
             sig = Join(vals, "|") & "|" & matV & "|" & vcV & "|" & cycV

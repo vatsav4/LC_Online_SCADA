@@ -150,6 +150,10 @@ syntax check, Trigger **Cyclic 2 s**, save as `UBolt_To_SQL.bac`. Then set **`Us
 SELECT * FROM dbo.UBolt_Data;
 ```
 
+If the table stays empty, open the **GSC Diagnostics** window in Runtime. The script names the problem there:
+`SQL write failed …` (login / table / network) or `LH not logged, tag not readable or bad quality: <tag>` (a tag name
+that doesn't exist, or a tag without a PLC connection).
+
 On the dashboard (Station 6) a nut is OK when its actual torque is at least the set torque. The values are only shown
 when `MAT_No` matches Station 6's `MAT_Number` in `Station_Mapping`; otherwise the U-bolt boxes stay grey
 ("other vehicle").

@@ -24,8 +24,8 @@
   }
   const show = v => (v === null || v === undefined ? "-" : v);
   const statusClass = s => (s === "OK" ? "ok" : s === "PENDING" ? "pending" : "bad");
-  // ring / bar fill: counts done of set, or for a U-bolt group the nuts done of 4
-  const pct = t => (t.kind === "ubolt" ? (t.nuts && t.nuts.length ? Math.floor(t.done * 100 / t.nuts.length) : 0)
+  // ring / bar fill: counts done of set, or for a nut group (U-bolt / wheel) the nuts done
+  const pct = t => (t.kind === "nuts" ? (t.nuts && t.nuts.length ? Math.floor(t.done * 100 / t.nuts.length) : 0)
     : t.set ? Math.max(0, Math.min(100, Math.floor((t.actual || 0) * 100 / t.set))) : 0);
   const nm = v => (v === null || v === undefined ? "-" : String(Math.round(v * 10) / 10));   // torque, 1 decimal
   const isPlaced = t => t.x !== null && t.x !== undefined;
@@ -42,7 +42,7 @@
   }
 
   // ---------------------------------------------------------------- render
-  // U-bolt group: set torque and the 4 nut torques, each nut green (>= set) or red
+  // nut group (U-bolt: 4 nuts, wheel: 6 nuts): set torque and the nut torques, each green (>= set) or red
   function ubCard(t) {
     const cls = statusClass(t.status);
     const nuts = (t.nuts || []).map((n, i) =>
@@ -51,13 +51,13 @@
       <div class="tool-title" title="${esc(t.label)}">${esc(t.short)}: ${esc(t.label)}</div>
       <div class="tool-meta">${t.status === "PENDING" ? `<span class="chip">${esc(t.note || "awaiting data")}</span>` : ""}</div>
       <div class="tool-row"><span>Set Torque:</span><b>${t.set === null || t.set === undefined ? "-" : esc(nm(t.set)) + " Nm"}</b></div>
-      <div class="nuts">${nuts || '<span class="nut nut-pending">-</span>'.repeat(4)}</div>
+      <div class="nuts${(t.nut_count || 4) > 4 ? " nuts-many" : ""}">${nuts || '<span class="nut nut-pending">-</span>'.repeat(t.nut_count || 4)}</div>
       <div class="bar"><i style="width:${pct(t)}%"></i></div>
     </div>`;
   }
 
   function card(t) {
-    if (t.kind === "ubolt") return ubCard(t);
+    if (t.kind === "nuts") return ubCard(t);
     const cls = statusClass(t.status);
     return `<div class="tool-box tool-${cls}" data-tag="${esc(t.tag)}">
       <div class="tool-title" title="${esc(t.tag)}: ${esc(t.label)}">${esc(t.tag)}: ${esc(t.label)}</div>

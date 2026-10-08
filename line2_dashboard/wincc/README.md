@@ -5,6 +5,7 @@ Two independent global actions, each with its own SQL connection:
 - `Torques_To_SQL_Action.vbs`: torque wrench counts → `dbo.Torques_Actual_Data`
 - `S3_Controls_To_SQL_Action.vbs`: S3 controls (Station 7) → `dbo.S3_Controls_Data` ([see below](#s3-controls))
 - `UBolt_To_SQL_Action.vbs`: U-bolt nut torques (Station 6) → `dbo.UBolt_Data` ([see below](#u-bolt-tightening))
+- `Wheel_To_SQL_Action.vbs`: wheel nut torques (Station 15) → `dbo.Wheel_Nut_Data` ([see below](#wheel-nut-tightening))
 
 ## Torque wrench counts
 
@@ -157,3 +158,46 @@ that doesn't exist, or a tag without a PLC connection).
 On the dashboard (Station 6) a nut is OK when its actual torque is at least the set torque. The values are only shown
 when `MAT_No` matches Station 6's `MAT_Number` in `Station_Mapping`; otherwise the U-bolt boxes stay grey
 ("other vehicle").
+
+## Wheel nut tightening
+
+`Wheel_To_SQL_Action.vbs` works like the U-bolt script. Every 2 s it copies the tags of groups `WEEL_LH` and
+`WEEL_RH` into `dbo.Wheel_Nut_Data`, one row per side. The RH tags are the LH names with `LH` changed to `RH`.
+Only the first 6 nuts of each wheel are logged.
+
+| Column | From tag (LH; RH the same with `RH`) |
+|---|---|
+| `Side` | `'LH'` / `'RH'` |
+| `MAT_No` | `W_LH_MAT_NO` |
+| `VC_No` | `W_LH_VC_NO` |
+| `Set_Torque` | `W_LH_SET_TORQUE_SP1` (both spindles have the same set torque) |
+| `Front_1` … `Front_6` | `WLH_ACT_T.F_BOLT1` … `WLH_ACT_T.F_BOLT6` |
+| `Rear_1` … `Rear_6` | `WLH_ACT_T.R_BOLT10` … `WLH_ACT_T.R_BOLT15` |
+| `Cycle_Complete` | `W_LH_CYCLE_COMPLETE` |
+| `Logged_At` | SQL Server time of the last write |
+
+### Create the table (once)
+
+```sql
+CREATE TABLE dbo.Wheel_Nut_Data (
+    Side           CHAR(2)       NOT NULL PRIMARY KEY,   -- 'LH' / 'RH'
+    MAT_No         NVARCHAR(40)  NULL,
+    VC_No          NVARCHAR(40)  NULL,
+    Set_Torque     DECIMAL(9,2)  NULL,
+    Front_1 DECIMAL(9,2) NULL, Front_2 DECIMAL(9,2) NULL, Front_3 DECIMAL(9,2) NULL,
+    Front_4 DECIMAL(9,2) NULL, Front_5 DECIMAL(9,2) NULL, Front_6 DECIMAL(9,2) NULL,
+    Rear_1  DECIMAL(9,2) NULL, Rear_2  DECIMAL(9,2) NULL, Rear_3  DECIMAL(9,2) NULL,
+    Rear_4  DECIMAL(9,2) NULL, Rear_5  DECIMAL(9,2) NULL, Rear_6  DECIMAL(9,2) NULL,
+    Cycle_Complete BIT           NULL,
+    Logged_At      DATETIME2(0)  NULL
+);
+```
+
+### Install and check
+
+Same as the U-bolt script: new action, paste `Wheel_To_SQL_Action.vbs`, Trigger **Cyclic 2 s**, save as
+`Wheel_To_SQL.bac`, set **`User ID` and `Password`** in `CONN_STR`. Then `SELECT * FROM dbo.Wheel_Nut_Data;`.
+If the table stays empty, the **GSC Diagnostics** window names the problem (SQL error, or the tag that can't be read).
+
+On the dashboard (Station 15) a nut is OK when its actual torque is at least the set torque; the values are only shown
+when `MAT_No` matches Station 15's `MAT_Number` in `Station_Mapping`.

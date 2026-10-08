@@ -1,5 +1,17 @@
 {% extends "station_base.html" %}
+{#
+  Wheel nut groups (logged by wincc/Wheel_To_SQL_Action.vbs into dbo.Wheel_Nut_Data):
+    WHEEL_LH_FRONT, WHEEL_LH_REAR, WHEEL_RH_FRONT, WHEEL_RH_REAR
+  One box / circle per wheel with its 6 nut torques; a nut is OK when actual >= set torque.
+  Shown only when the wheel MAT number is the vehicle at this station (Station_Mapping).
+  RH on top, LH at the bottom (as stations 6 and 7). Positions are a first guess - a manager
+  can drag them onto the wheels.
+#}
 
 {% set chassis_image = "IMG_5.jpg" %}
 {% set tools = [
+    {"t_no": "WHEEL_RH_FRONT", "name": "RH Front Wheel", "x": 22, "y": 30},
+    {"t_no": "WHEEL_RH_REAR", "name": "RH Rear Wheel", "x": 75, "y": 30},
+    {"t_no": "WHEEL_LH_FRONT", "name": "LH Front Wheel", "x": 22, "y": 70},
+    {"t_no": "WHEEL_LH_REAR", "name": "LH Rear Wheel", "x": 75, "y": 70},
 ] %}

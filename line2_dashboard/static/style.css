@@ -424,6 +424,10 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 85vw; }   /* turne
 .nut-bad { background: var(--red-dark); color: #fff; }
 .nut-pending { background: rgba(255, 255, 255, 0.45); color: #556; }
 .tool-ub .bar { margin-top: 0.3rem; }
+/* 6 nuts (wheel): smaller numbers so they fit the box width */
+.nuts-many { gap: 0.2rem; }
+.nuts-many .nut { font-size: 0.74rem; letter-spacing: -0.02em; }
+.portrait .nuts-many .nut, .narrow .nuts-many .nut { font-size: 0.64rem; }
 
 .unplaced { margin: 0.8rem auto 0; }
 .unplaced-title { text-align: center; color: #556; font-size: 0.95rem; margin: 0 0 0.5rem; }

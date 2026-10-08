@@ -7,7 +7,7 @@ It's laid out for desktop screens: a whole station fits on one screen without sc
 |---|---|
 | ![Overview](docs/overview.png) | ![Station](docs/station1.png) |
 
-## Data: four tables
+## Data: five tables
 
 On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with `SERVER=172.25.208.39,49561`; note the comma):
 
@@ -17,6 +17,7 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
 | `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
 | `UBolt_Data` (`Side`, `MAT_No`, set and 8 actual nut torques) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
+| `Wheel_Nut_Data` (`Side`, `MAT_No`, set and 12 actual nut torques) | `wincc/Wheel_To_SQL_Action.vbs` | wheel boxes (Station 15) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
 table yet. A wrench whose **Set Count is 0** (not used for the vehicle model now at the station) is not shown and not
@@ -93,6 +94,12 @@ RF, RR) and one box with the set torque and its 4 nut torques. A nut is green wh
 set torque, and the box is green when all 4 are. The values are only shown when the U-bolt MAT number matches the
 station's MAT in `Station_Mapping`. Otherwise the box is grey with "other vehicle" (or "no MAT at station" if
 `Station_Mapping` has no MAT for the station).
+
+## Wheel nut tightening on a station
+
+Like the U-bolts: list `WHEEL_LH_FRONT`, `WHEEL_LH_REAR`, `WHEEL_RH_FRONT` and `WHEEL_RH_REAR` as tools (see
+`station_15.html`). Each wheel gets one circle and one box with the set torque and its 6 nut torques, shown only when
+the wheel MAT number matches the station's MAT.
 
 ## S3 controls on a station
 

@@ -11,6 +11,8 @@ Tables on the Line-2 SQL Server (reachable only on port 49561):
   dbo.UBolt_Data           Side ('LH' / 'RH'), MAT_No, Front_Set, Rear_Set, Front_1..4, Rear_1..4, ...
                            (U-bolt nut torques, written by wincc/UBolt_To_SQL_Action.vbs). A station
                            template lists a U-bolt group as a tool: {"t_no": "UBOLT_LH_FRONT", ...}.
+  dbo.Wheel_Nut_Data       Side, MAT_No, Set_Torque, Front_1..6, Rear_1..6, ... (wheel nut torques,
+                           written by wincc/Wheel_To_SQL_Action.vbs); tools "WHEEL_LH_FRONT", ...
 
 Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
@@ -101,6 +103,7 @@ state = {
     "torques": {},   # {"T1": {"name": .., "set": .., "actual": .., "bypass": bool}}
     "s3": {},        # {"INVERSION_OVER_TRAVEL": {"value": 0 / 1 / None, "changed": datetime}}
     "ubolts": {},    # {"LH": {"mat": .., "front_set": .., "rear_set": .., "front": [4], "rear": [4]}}
+    "wheels": {},    # same shape, 6 nuts per wheel, one set torque for front and rear
     "updated_at": None,
     "db_ok": False,
 }
@@ -142,7 +145,7 @@ def fetch_tables(conn):
     torques = {str(r[0]).strip().upper(): {"name": str(r[1] or "").strip(), "set": _num(r[2]),
                                            "actual": _num(r[3]), "bypass": r[4] in (True, 1, "1")}
                for r in cur.fetchall() if r[0]}
-    return mapping, torques, fetch_s3(conn), fetch_ubolts(conn)
+    return mapping, torques, fetch_s3(conn), fetch_ubolts(conn), fetch_wheels(conn)
 
 
 _s3_failed = False  # log a missing / broken S3 table once, not every poll
@@ -188,11 +191,34 @@ def fetch_ubolts(conn):
             for r in rows if r[0]}
 
 
+_wheel_failed = False
+
+
+def fetch_wheels(conn):
+    """Wheel nut torques, one row per side (6 nuts per wheel); on its own like the U-bolt table."""
+    global _wheel_failed
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT Side, MAT_No, Set_Torque, Front_1, Front_2, Front_3, Front_4, Front_5, Front_6, "
+                    "Rear_1, Rear_2, Rear_3, Rear_4, Rear_5, Rear_6 FROM dbo.Wheel_Nut_Data")
+        rows = cur.fetchall()
+    except Exception as e:
+        if not _wheel_failed:
+            logger.error(f"Wheel_Nut_Data not readable (wheel boxes show awaiting data): {e}")
+        _wheel_failed = True
+        return {}
+    _wheel_failed = False
+    return {str(r[0]).strip().upper(): {"mat": str(r[1] or "").strip(), "front_set": _num(r[2]),
+                                        "rear_set": _num(r[2]), "front": [_num(v) for v in r[3:9]],
+                                        "rear": [_num(v) for v in r[9:15]]}
+            for r in rows if r[0]}
+
+
 def demo_tables():
     """Sample data for demo_mode = true (no database). T2 / T3 count up so the page looks live."""
     tick = int(time.time() // 3)
     mapping = {1: ("55072654300R", "MAT784062TFJ12788"), 2: ("55072654300R", "MAT784062TFJ12787"),
-               6: ("55072654400R", "MAT784062TFK13049"),
+               6: ("55072654400R", "MAT784062TFK13049"), 15: ("55072654600R", "MAT784062TFK13051"),
                4: ("55329329000R", "MAT805017TFJ12785"), 5: ("55131252100R", "MAT513357TFJ12784"),
                8: ("55131252100R", "MAT513357TFJ12781"), 10: ("55131252100R", "MAT513357TFJ12779")}
     torques = {"T1": ("SG Tightening", 5, 5, 0), "T2": ("Tail Tightening", 5, tick % 7, 0),
@@ -213,23 +239,30 @@ def demo_tables():
                      "front": [270.4, 270.6, 270.7, 270.3], "rear": [270.5, 270.9, 271.2, 270.3]},
               "RH": {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
                      "front": [270.8, 268.1, 270.2, 270.5], "rear": [271.0] * nuts + [0] * (4 - nuts)}}
+    # wheel nuts at station 15: LH done, RH front has one low nut, RH rear being tightened
+    wnuts = min(6, tick % 8)
+    wheels = {"LH": {"mat": "MAT784062TFK13051", "front_set": 400, "rear_set": 400,
+                     "front": [401.2, 400.5, 402.0, 400.8, 401.1, 400.3], "rear": [400.9, 401.5, 400.2, 402.3, 400.7, 401.0]},
+              "RH": {"mat": "MAT784062TFK13051", "front_set": 400, "rear_set": 400,
+                     "front": [400.6, 401.3, 396.4, 400.9, 401.8, 400.2], "rear": [401.0] * wnuts + [0] * (6 - wnuts)}}
     return ({n: {"vc": vc, "mat": mat} for n, (vc, mat) in mapping.items()},
             {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()},
-            s3, ubolts)
+            s3, ubolts, wheels)
 
 
 def poll_once():
     try:
         if DEMO_MODE:
-            mapping, torques, s3, ubolts = demo_tables()
+            mapping, torques, s3, ubolts, wheels = demo_tables()
         else:
             conn = connect(LINE_DB)
             try:
-                mapping, torques, s3, ubolts = fetch_tables(conn)
+                mapping, torques, s3, ubolts, wheels = fetch_tables(conn)
             finally:
                 conn.close()
         with state_lock:
-            state["mapping"], state["torques"], state["s3"], state["ubolts"] = mapping, torques, s3, ubolts
+            state["mapping"], state["torques"], state["s3"] = mapping, torques, s3
+            state["ubolts"], state["wheels"] = ubolts, wheels
             state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             state["db_ok"] = True
     except Exception as e:
@@ -347,17 +380,19 @@ def _since(changed):
     return f"{changed:%H:%M:%S}" if changed.date() == datetime.now().date() else f"{changed:%d-%m %H:%M}"
 
 
-_UBOLT = re.compile(r"^UBOLT_(LH|RH)_(FRONT|REAR)$")
+# nut groups listed as tools: U-bolts (4 nuts, station 6) and wheels (6 nuts, station 15)
+_NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
+_UBOLT = _NUT_GROUP   # older name
 
 # TEMPORARY: LH_RF_IN_SET_TORQUE (LH front set torque) gives wrong values, so the LH front
 # box uses the RH front set torque instead. Delete this line once the LH tag is fixed.
 UBOLT_SET_FROM = {("LH", "FRONT"): ("RH", "FRONT")}
 
 
-def _ubolt_tool(t, side, end, ubolts, station_mat):
-    """One U-bolt group (4 nuts) as a station box. A nut is OK when its actual torque >= the set
-    torque. Values are only shown when the U-bolt MAT number is the vehicle at this station."""
-    row = (ubolts or {}).get(side)
+def _nut_group_tool(t, kind, side, end, rows, station_mat):
+    """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
+    >= the set torque. Values are only shown when the logged MAT number is the vehicle at this station."""
+    row = (rows or {}).get(side)
     note = ""
     if row is None:
         note = "awaiting data"
@@ -366,9 +401,9 @@ def _ubolt_tool(t, side, end, ubolts, station_mat):
     elif row["mat"].upper() != station_mat.upper():
         note = "other vehicle"
     set_value = None if note else row[end.lower() + "_set"]
-    if not note and (side, end) in UBOLT_SET_FROM:       # set torque taken from the other side
+    if not note and kind == "UBOLT" and (side, end) in UBOLT_SET_FROM:   # set torque taken from the other side
         from_side, from_end = UBOLT_SET_FROM[(side, end)]
-        set_value = ((ubolts or {}).get(from_side) or {}).get(from_end.lower() + "_set")
+        set_value = ((rows or {}).get(from_side) or {}).get(from_end.lower() + "_set")
     nuts = []
     for v in ([] if note else row[end.lower()]):
         state = "pending" if v is None or set_value is None else ("ok" if v >= set_value else "bad")
@@ -379,23 +414,26 @@ def _ubolt_tool(t, side, end, ubolts, station_mat):
     else:
         status = "OK" if nuts and all(n["state"] == "ok" for n in nuts) else "NOT OK"
     return {
-        "kind": "ubolt", "hidden": False, "tag": t["t_no"],
+        "kind": "nuts", "hidden": False, "tag": t["t_no"],
         "short": side[0] + end[0],          # LF, LR, RF, RR on the circle
-        "label": t["name"] or f"{side} {end.title()} U-bolt",
+        "label": t["name"] or f"{side} {end.title()} {'U-bolt' if kind == 'UBOLT' else 'Wheel'}",
+        "nut_count": 4 if kind == "UBOLT" else 6,
         "x": t["x"], "y": t["y"],
         "set": set_value, "nuts": nuts, "done": sum(n["state"] == "ok" for n in nuts),
         "status": status, "note": note,
     }
 
 
-def build_station(station_id, mapping, torques, s3=None, ubolts=None):
+def build_station(station_id, mapping, torques, s3=None, ubolts=None, wheels=None):
     config = station_config(station_id)
     vehicle = mapping.get(station_id, {})
     tools = []
     for t in config["tools"]:
-        ub = _UBOLT.match(t["t_no"])
-        if ub:
-            tools.append(_ubolt_tool(t, ub.group(1), ub.group(2), ubolts, vehicle.get("mat", "")))
+        ng = _NUT_GROUP.match(t["t_no"])
+        if ng:
+            kind, side, end = ng.groups()
+            tools.append(_nut_group_tool(t, kind, side, end, ubolts if kind == "UBOLT" else wheels,
+                                         vehicle.get("mat", "")))
             continue
         row = torques.get(t["t_no"])
         if row is None or row["set"] is None or row["actual"] is None:
@@ -437,7 +475,8 @@ def build_station(station_id, mapping, torques, s3=None, ubolts=None):
 
 def _snapshot():
     with state_lock:
-        return ((dict(state["mapping"]), dict(state["torques"]), dict(state["s3"]), dict(state["ubolts"])),
+        return ((dict(state["mapping"]), dict(state["torques"]), dict(state["s3"]), dict(state["ubolts"]),
+                 dict(state["wheels"])),
                 state["db_ok"], state["updated_at"])
 
 

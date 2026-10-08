@@ -133,19 +133,37 @@ def test_s3_status_1_is_not_ok(known_templates):
 def test_fetch_tables_reads_both_tables():
     results = [[(1, "VC1 ", "MAT1")], [("t1 ", " SG ", 5, 3, 1), (None, "", 0, 0, 0)],
                [("Inversion_Over_Travel", True, None), ("X", None, None)],
-               [("lh", "MAT1 ", 270, 270.3, 270.4, 270.6, None, 0, 1, 2, 3, 4)]]
+               [("lh", "MAT1 ", 270, 270.3, 270.4, 270.6, None, 0, 1, 2, 3, 4)],
+               [("RH", "MAT2", 400, 401, 402, 403, 404, 405, 406, 0, 0, 0, 0, 0, None)]]
     class Cur:
         def execute(self, sql):
             self.rows = results.pop(0)
         def fetchall(self):
             return self.rows
     conn = types.SimpleNamespace(cursor=lambda: Cur())
-    mapping, torques, s3, ubolts = line2.fetch_tables(conn)
+    mapping, torques, s3, ubolts, wheels = line2.fetch_tables(conn)
     assert mapping == {1: {"vc": "VC1", "mat": "MAT1"}}
     assert torques == {"T1": {"name": "SG", "set": 5, "actual": 3, "bypass": True}}
     assert s3 == {"INVERSION_OVER_TRAVEL": {"value": 1, "changed": None}, "X": {"value": None, "changed": None}}
     assert ubolts == {"LH": {"mat": "MAT1", "front_set": 270, "rear_set": 270.3,
                              "front": [270.4, 270.6, None, 0], "rear": [1, 2, 3, 4]}}
+    assert wheels == {"RH": {"mat": "MAT2", "front_set": 400, "rear_set": 400,
+                             "front": [401, 402, 403, 404, 405, 406], "rear": [0, 0, 0, 0, 0, None]}}
+
+
+def test_wheel_groups_have_six_nuts(known_templates):
+    (known_templates / "station_15.html").write_text(
+        '{% extends "station_base.html" %}{% set tools = [{"t_no": "WHEEL_LH_FRONT", "name": ""},'
+        ' {"t_no": "WHEEL_RH_REAR", "name": "RH Rear"}] %}')
+    wheels = {"LH": {"mat": "M1", "front_set": 400, "rear_set": 400, "front": [401, 400, 400.5, 402, 400, 401],
+                     "rear": [0] * 6},
+              "RH": {"mat": "M1", "front_set": 400, "rear_set": 400, "front": [0] * 6, "rear": [400, 0, 0, 0, 0, 0]}}
+    lf, rr = line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"]
+    assert (lf["label"], lf["nut_count"], lf["status"], lf["done"]) == ("LH Front Wheel", 6, "OK", 6)
+    assert (rr["short"], rr["status"], rr["done"]) == ("RR", "NOT OK", 1)
+    # the temporary U-bolt set-torque swap doesn't touch wheels
+    wheels["LH"]["front_set"] = 999
+    assert line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"][0]["set"] == 999
 
 
 def test_ubolt_groups_need_the_station_mat(known_templates):

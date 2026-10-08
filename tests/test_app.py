@@ -16,7 +16,8 @@ def test_every_station_template_has_a_valid_tool_list():
         cfg = line2.station_config(n)
         assert os.path.isfile(os.path.join(TEMPLATES, "..", "static", "chassis", cfg["chassis_image"])), n
         for t in cfg["tools"]:
-            assert t["t_no"].startswith("T") and 0 <= t["x"] <= 100 and 0 <= t["y"] <= 100
+            assert (t["t_no"].startswith("T") or line2._UBOLT.match(t["t_no"])), t["t_no"]
+            assert t["x"] is None or (0 <= t["x"] <= 100 and 0 <= t["y"] <= 100)
 
 
 STATION_5 = """{% extends "station_base.html" %}
@@ -131,17 +132,37 @@ def test_s3_status_1_is_not_ok(known_templates):
 
 def test_fetch_tables_reads_both_tables():
     results = [[(1, "VC1 ", "MAT1")], [("t1 ", " SG ", 5, 3, 1), (None, "", 0, 0, 0)],
-               [("Inversion_Over_Travel", True, None), ("X", None, None)]]
+               [("Inversion_Over_Travel", True, None), ("X", None, None)],
+               [("lh", "MAT1 ", 270, 270.3, 270.4, 270.6, None, 0, 1, 2, 3, 4)]]
     class Cur:
         def execute(self, sql):
             self.rows = results.pop(0)
         def fetchall(self):
             return self.rows
     conn = types.SimpleNamespace(cursor=lambda: Cur())
-    mapping, torques, s3 = line2.fetch_tables(conn)
+    mapping, torques, s3, ubolts = line2.fetch_tables(conn)
     assert mapping == {1: {"vc": "VC1", "mat": "MAT1"}}
     assert torques == {"T1": {"name": "SG", "set": 5, "actual": 3, "bypass": True}}
     assert s3 == {"INVERSION_OVER_TRAVEL": {"value": 1, "changed": None}, "X": {"value": None, "changed": None}}
+    assert ubolts == {"LH": {"mat": "MAT1", "front_set": 270, "rear_set": 270.3,
+                             "front": [270.4, 270.6, None, 0], "rear": [1, 2, 3, 4]}}
+
+
+def test_ubolt_groups_need_the_station_mat(known_templates):
+    (known_templates / "station_6.html").write_text(
+        '{% extends "station_base.html" %}{% set tools = [{"t_no": "ubolt_lh_front", "name": "LH Front"},'
+        ' {"t_no": "UBOLT_RH_REAR", "name": ""}] %}')
+    ubolts = {"LH": {"mat": "MAT9", "front_set": 270, "rear_set": 270.3, "front": [270.4, 270, 269.9, 0],
+                     "rear": [0] * 4},
+              "RH": {"mat": "MAT9", "front_set": 270, "rear_set": 270.3, "front": [0] * 4, "rear": [270.3] * 4}}
+    st = line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)
+    lf, rr = st["tools"]
+    assert (lf["short"], lf["status"], [n["state"] for n in lf["nuts"]]) == ("LF", "NOT OK", ["ok", "ok", "bad", "bad"])
+    assert (rr["short"], rr["label"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", "OK", 4)
+    other = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]
+    assert (other["status"], other["note"], other["nuts"]) == ("PENDING", "other vehicle", [])
+    assert line2.build_station(6, {}, {}, {}, ubolts)["tools"][0]["note"] == "no MAT at station"
+    assert line2.build_station(6, {6: {"vc": "", "mat": "MAT9"}}, {}, {}, {})["tools"][0]["note"] == "awaiting data"
 
 
 def test_missing_s3_table_does_not_stop_torques():

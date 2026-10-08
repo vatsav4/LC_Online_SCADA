@@ -4,6 +4,7 @@ Two independent global actions, each with its own SQL connection:
 
 - `Torques_To_SQL_Action.vbs`: torque wrench counts → `dbo.Torques_Actual_Data`
 - `S3_Controls_To_SQL_Action.vbs`: S3 controls (Station 7) → `dbo.S3_Controls_Data` ([see below](#s3-controls))
+- `UBolt_To_SQL_Action.vbs`: U-bolt nut torques (Station 6) → `dbo.UBolt_Data` ([see below](#u-bolt-tightening))
 
 ## Torque wrench counts
 
@@ -102,3 +103,53 @@ SELECT * FROM dbo.S3_Controls_Data ORDER BY Station_No, Tag_Name;
 ```
 
 Note: like any 2 s cyclic action, a signal that flips and returns within less than 2 s may not be seen.
+
+## U-bolt tightening
+
+`UBolt_To_SQL_Action.vbs` follows the same safe pattern. Every 2 s it copies the tags of groups `UBOLT_LH` and
+`UBOLT_RH` into `dbo.UBolt_Data`, one row per side. The RH tags are the LH names with `LH` changed to `RH`.
+
+| Column | From tag (LH; RH the same with `RH_`) |
+|---|---|
+| `Side` | `'LH'` / `'RH'` |
+| `MAT_No` | `LH_MAT_NO_Str` |
+| `VC_No` | `LH_VC_NO_Str_1` |
+| `Front_Set` | `LH_RF_IN_SET_TORQUE` |
+| `Rear_Set` | `LH_RR_IN_SET_TORQUE` |
+| `Front_1` … `Front_4` | `LH_ACT_FRONT_TORQUE_1` … `_4` |
+| `Rear_1` … `Rear_4` | `LH_ACT_REAR_TORQUE_1` … `_4` |
+| `Cycle_Complete` | `LH_CYCLE_COMPLETE` |
+| `Logged_At` | SQL Server time of the last write |
+
+The torque tags are text like `+270.40`; they're stored as numbers.
+
+### Create the table (once)
+
+```sql
+CREATE TABLE dbo.UBolt_Data (
+    Side           CHAR(2)       NOT NULL PRIMARY KEY,   -- 'LH' / 'RH'
+    MAT_No         NVARCHAR(40)  NULL,
+    VC_No          NVARCHAR(40)  NULL,
+    Front_Set      DECIMAL(9,2)  NULL,
+    Rear_Set       DECIMAL(9,2)  NULL,
+    Front_1 DECIMAL(9,2) NULL, Front_2 DECIMAL(9,2) NULL, Front_3 DECIMAL(9,2) NULL, Front_4 DECIMAL(9,2) NULL,
+    Rear_1  DECIMAL(9,2) NULL, Rear_2  DECIMAL(9,2) NULL, Rear_3  DECIMAL(9,2) NULL, Rear_4  DECIMAL(9,2) NULL,
+    Cycle_Complete BIT           NULL,
+    Logged_At      DATETIME2(0)  NULL
+);
+```
+
+### Install
+
+Same as the other scripts: VBS Editor → *Actions* → new action, paste `UBolt_To_SQL_Action.vbs` over the template,
+syntax check, Trigger **Cyclic 2 s**, save as `UBolt_To_SQL.bac`. Then set **`User ID` and `Password`** in `CONN_STR`.
+
+### Check
+
+```sql
+SELECT * FROM dbo.UBolt_Data;
+```
+
+On the dashboard (Station 6) a nut is OK when its actual torque is at least the set torque. The values are only shown
+when `MAT_No` matches Station 6's `MAT_Number` in `Station_Mapping`; otherwise the U-bolt boxes stay grey
+("other vehicle").

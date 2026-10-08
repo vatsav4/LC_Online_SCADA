@@ -8,6 +8,9 @@ Tables on the Line-2 SQL Server (reachable only on port 49561):
   dbo.S3_Controls_Data     Station_No, Tag_Name, Status, Changed_At
                            (one row per S3 control, 1 = NOT OK / 0 = OK,
                             written by wincc/S3_Controls_To_SQL_Action.vbs)
+  dbo.UBolt_Data           Side ('LH' / 'RH'), MAT_No, Front_Set, Rear_Set, Front_1..4, Rear_1..4, ...
+                           (U-bolt nut torques, written by wincc/UBolt_To_SQL_Action.vbs). A station
+                           template lists a U-bolt group as a tool: {"t_no": "UBOLT_LH_FRONT", ...}.
 
 Which wrenches a station shows, and where each circle sits on the chassis
 picture, is written in that station's template: templates/station_<n>.html
@@ -97,6 +100,7 @@ state = {
     "mapping": {},   # {station_no: {"vc": .., "mat": ..}}
     "torques": {},   # {"T1": {"name": .., "set": .., "actual": .., "bypass": bool}}
     "s3": {},        # {"INVERSION_OVER_TRAVEL": {"value": 0 / 1 / None, "changed": datetime}}
+    "ubolts": {},    # {"LH": {"mat": .., "front_set": .., "rear_set": .., "front": [4], "rear": [4]}}
     "updated_at": None,
     "db_ok": False,
 }
@@ -138,7 +142,7 @@ def fetch_tables(conn):
     torques = {str(r[0]).strip().upper(): {"name": str(r[1] or "").strip(), "set": _num(r[2]),
                                            "actual": _num(r[3]), "bypass": r[4] in (True, 1, "1")}
                for r in cur.fetchall() if r[0]}
-    return mapping, torques, fetch_s3(conn)
+    return mapping, torques, fetch_s3(conn), fetch_ubolts(conn)
 
 
 _s3_failed = False  # log a missing / broken S3 table once, not every poll
@@ -161,10 +165,34 @@ def fetch_s3(conn):
             for r in rows if r[0]}
 
 
+_ubolt_failed = False
+
+
+def fetch_ubolts(conn):
+    """U-bolt nut torques, one row per side; on its own like the S3 table."""
+    global _ubolt_failed
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT Side, MAT_No, Front_Set, Rear_Set, Front_1, Front_2, Front_3, Front_4, "
+                    "Rear_1, Rear_2, Rear_3, Rear_4 FROM dbo.UBolt_Data")
+        rows = cur.fetchall()
+    except Exception as e:
+        if not _ubolt_failed:
+            logger.error(f"UBolt_Data not readable (U-bolt boxes show awaiting data): {e}")
+        _ubolt_failed = True
+        return {}
+    _ubolt_failed = False
+    return {str(r[0]).strip().upper(): {"mat": str(r[1] or "").strip(), "front_set": _num(r[2]),
+                                        "rear_set": _num(r[3]), "front": [_num(v) for v in r[4:8]],
+                                        "rear": [_num(v) for v in r[8:12]]}
+            for r in rows if r[0]}
+
+
 def demo_tables():
     """Sample data for demo_mode = true (no database). T2 / T3 count up so the page looks live."""
     tick = int(time.time() // 3)
     mapping = {1: ("55072654300R", "MAT784062TFJ12788"), 2: ("55072654300R", "MAT784062TFJ12787"),
+               6: ("55072654400R", "MAT784062TFK13049"),
                4: ("55329329000R", "MAT805017TFJ12785"), 5: ("55131252100R", "MAT513357TFJ12784"),
                8: ("55131252100R", "MAT513357TFJ12781"), 10: ("55131252100R", "MAT513357TFJ12779")}
     torques = {"T1": ("SG Tightening", 5, 5, 0), "T2": ("Tail Tightening", 5, tick % 7, 0),
@@ -179,23 +207,29 @@ def demo_tables():
     s3 = {"INVERSION_LIGHT_CURTAIN_LH": {"value": int(tick % 5 != 0), "changed": since},
           "INVERSION_LIGHT_CURTAIN_RH": {"value": 1, "changed": since.replace(hour=6, minute=0, second=0)},
           "INVERSION_OVER_TRAVEL": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)}}
+    # U-bolts at station 6: LH done, RH rear being tightened nut by nut
+    nuts = min(4, tick % 6)
+    ubolts = {"LH": {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
+                     "front": [270.4, 270.6, 270.7, 270.3], "rear": [270.5, 270.9, 271.2, 270.3]},
+              "RH": {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
+                     "front": [270.8, 268.1, 270.2, 270.5], "rear": [271.0] * nuts + [0] * (4 - nuts)}}
     return ({n: {"vc": vc, "mat": mat} for n, (vc, mat) in mapping.items()},
             {t: {"name": n, "set": s, "actual": a, "bypass": bool(b)} for t, (n, s, a, b) in torques.items()},
-            s3)
+            s3, ubolts)
 
 
 def poll_once():
     try:
         if DEMO_MODE:
-            mapping, torques, s3 = demo_tables()
+            mapping, torques, s3, ubolts = demo_tables()
         else:
             conn = connect(LINE_DB)
             try:
-                mapping, torques, s3 = fetch_tables(conn)
+                mapping, torques, s3, ubolts = fetch_tables(conn)
             finally:
                 conn.close()
         with state_lock:
-            state["mapping"], state["torques"], state["s3"] = mapping, torques, s3
+            state["mapping"], state["torques"], state["s3"], state["ubolts"] = mapping, torques, s3, ubolts
             state["updated_at"] = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
             state["db_ok"] = True
     except Exception as e:
@@ -313,11 +347,49 @@ def _since(changed):
     return f"{changed:%H:%M:%S}" if changed.date() == datetime.now().date() else f"{changed:%d-%m %H:%M}"
 
 
-def build_station(station_id, mapping, torques, s3=None):
+_UBOLT = re.compile(r"^UBOLT_(LH|RH)_(FRONT|REAR)$")
+
+
+def _ubolt_tool(t, side, end, ubolts, station_mat):
+    """One U-bolt group (4 nuts) as a station box. A nut is OK when its actual torque >= the set
+    torque. Values are only shown when the U-bolt MAT number is the vehicle at this station."""
+    row = (ubolts or {}).get(side)
+    note = ""
+    if row is None:
+        note = "awaiting data"
+    elif not station_mat:
+        note = "no MAT at station"
+    elif row["mat"].upper() != station_mat.upper():
+        note = "other vehicle"
+    set_value = None if note else row[end.lower() + "_set"]
+    nuts = []
+    for v in ([] if note else row[end.lower()]):
+        state = "pending" if v is None or set_value is None else ("ok" if v >= set_value else "bad")
+        nuts.append({"value": v, "state": state})
+    if note or set_value is None:
+        status = "PENDING"
+        note = note or "awaiting data"
+    else:
+        status = "OK" if nuts and all(n["state"] == "ok" for n in nuts) else "NOT OK"
+    return {
+        "kind": "ubolt", "hidden": False, "tag": t["t_no"],
+        "short": side[0] + end[0],          # LF, LR, RF, RR on the circle
+        "label": t["name"] or f"{side} {end.title()} U-bolt",
+        "x": t["x"], "y": t["y"],
+        "set": set_value, "nuts": nuts, "done": sum(n["state"] == "ok" for n in nuts),
+        "status": status, "note": note,
+    }
+
+
+def build_station(station_id, mapping, torques, s3=None, ubolts=None):
     config = station_config(station_id)
     vehicle = mapping.get(station_id, {})
     tools = []
     for t in config["tools"]:
+        ub = _UBOLT.match(t["t_no"])
+        if ub:
+            tools.append(_ubolt_tool(t, ub.group(1), ub.group(2), ubolts, vehicle.get("mat", "")))
+            continue
         row = torques.get(t["t_no"])
         if row is None or row["set"] is None or row["actual"] is None:
             status = "PENDING"
@@ -326,8 +398,9 @@ def build_station(station_id, mapping, torques, s3=None):
         tools.append({
             # Set Count 0 = this wrench isn't used for the vehicle model now at the station:
             # not shown and not counted (the station page still lists it while a manager edits positions)
+            "kind": "torque",
             "hidden": row is not None and row["set"] == 0,
-            "tag": t["t_no"],
+            "tag": t["t_no"], "short": t["t_no"],
             "label": t["name"] or t["t_no"],  # name typed in the station template
             "x": t["x"], "y": t["y"],
             "set": (row or {}).get("set"),
@@ -357,7 +430,8 @@ def build_station(station_id, mapping, torques, s3=None):
 
 def _snapshot():
     with state_lock:
-        return (dict(state["mapping"]), dict(state["torques"]), dict(state["s3"])), state["db_ok"], state["updated_at"]
+        return ((dict(state["mapping"]), dict(state["torques"]), dict(state["s3"]), dict(state["ubolts"])),
+                state["db_ok"], state["updated_at"])
 
 
 def _all_stations():

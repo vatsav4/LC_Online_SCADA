@@ -386,6 +386,17 @@ body {
 .bar { height: 5px; margin-top: 0.4rem; background: rgba(0, 0, 0, 0.18); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: rgba(255, 255, 255, 0.85); transition: width 0.3s ease; }
 
+/* U-bolt group: 4 nut torques under the set torque */
+.nuts { display: flex; gap: 0.3rem; margin-top: 0.15rem; }
+.nut {
+  flex: 1; text-align: center; font-size: 0.9rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  border-radius: 6px; padding: 0.05rem 0; border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.nut-ok { background: rgba(255, 255, 255, 0.9); color: var(--green-dark); }
+.nut-bad { background: var(--red-dark); color: #fff; }
+.nut-pending { background: rgba(255, 255, 255, 0.45); color: #556; }
+.tool-ub .bar { margin-top: 0.3rem; }
+
 .unplaced { margin: 0.8rem auto 0; }
 .unplaced-title { text-align: center; color: #556; font-size: 0.95rem; margin: 0 0 0.5rem; }
 .station-view .updated { position: absolute; right: 1rem; bottom: 0.2rem; font-size: 0.72rem; color: #889; }

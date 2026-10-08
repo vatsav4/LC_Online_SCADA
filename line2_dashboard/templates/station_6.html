@@ -1,7 +1,18 @@
 {% extends "station_base.html" %}
+{#
+  U-bolt groups (logged by wincc/UBolt_To_SQL_Action.vbs into dbo.UBolt_Data):
+    UBOLT_LH_FRONT, UBOLT_LH_REAR, UBOLT_RH_FRONT, UBOLT_RH_REAR
+  One box / circle per group with its 4 nut torques; a nut is OK when actual >= set torque.
+  Shown only when the U-bolt MAT number is the vehicle at this station (Station_Mapping).
+  Positions below are a first guess - a manager can drag them onto the springs.
+#}
 
 {% set chassis_image = "IMG_2.jpg" %}
 {% set tools = [
     {"t_no": "T8", "name": "Drag Link Ball Joint", "x": 16, "y": 80.7},
     {"t_no": "T9", "name": "Drag Link GearBox and Axle End", "x": 83, "y": 25.6},
+    {"t_no": "UBOLT_LH_FRONT", "name": "LH Front U-Bolt", "x": 22, "y": 22},
+    {"t_no": "UBOLT_LH_REAR", "name": "LH Rear U-Bolt", "x": 70, "y": 22},
+    {"t_no": "UBOLT_RH_FRONT", "name": "RH Front U-Bolt", "x": 22, "y": 78},
+    {"t_no": "UBOLT_RH_REAR", "name": "RH Rear U-Bolt", "x": 70, "y": 78},
 ] %}

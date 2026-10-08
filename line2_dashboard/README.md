@@ -7,7 +7,7 @@ It's laid out for desktop screens: a whole station fits on one screen without sc
 |---|---|
 | ![Overview](docs/overview.png) | ![Station](docs/station1.png) |
 
-## Data: three tables
+## Data: four tables
 
 On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with `SERVER=172.25.208.39,49561`; note the comma):
 
@@ -16,6 +16,7 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | existing WinCC script `VB_S` | VC and MAT plates |
 | `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
 | `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
+| `UBolt_Data` (`Side`, `MAT_No`, set and 8 actual nut torques) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
 table yet. A wrench whose **Set Count is 0** (not used for the vehicle model now at the station) is not shown and not
@@ -77,6 +78,20 @@ Circles in the top half of the picture get their box above the chassis, the othe
 To switch a wrench off for a while, move its line out of the list into a `{# ... #}` comment. Don't use `<!-- -->` inside
 the list: that's a template mistake. If a template has a mistake, that station's page shows the error and the line number,
 the rest of the dashboard keeps working, and Save positions is refused until it is fixed.
+
+## U-bolt tightening on a station
+
+List a U-bolt group as a tool in the station's template (see `station_6.html`):
+
+```jinja
+    {"t_no": "UBOLT_LH_FRONT", "name": "LH Front U-Bolt", "x": 22, "y": 22},
+```
+
+The groups are `UBOLT_LH_FRONT`, `UBOLT_LH_REAR`, `UBOLT_RH_FRONT` and `UBOLT_RH_REAR`. Each gets one circle (LF, LR,
+RF, RR) and one box with the set torque and its 4 nut torques. A nut is green when its actual torque is at least the
+set torque, and the box is green when all 4 are. The values are only shown when the U-bolt MAT number matches the
+station's MAT in `Station_Mapping`. Otherwise the box is grey with "other vehicle" (or "no MAT at station" if
+`Station_Mapping` has no MAT for the station).
 
 ## S3 controls on a station
 

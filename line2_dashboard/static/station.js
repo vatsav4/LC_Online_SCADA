@@ -24,7 +24,10 @@
   }
   const show = v => (v === null || v === undefined ? "-" : v);
   const statusClass = s => (s === "OK" ? "ok" : s === "PENDING" ? "pending" : "bad");
-  const pct = t => (t.set ? Math.max(0, Math.min(100, Math.floor((t.actual || 0) * 100 / t.set))) : 0);
+  // ring / bar fill: counts done of set, or for a U-bolt group the nuts done of 4
+  const pct = t => (t.kind === "ubolt" ? (t.nuts && t.nuts.length ? Math.floor(t.done * 100 / t.nuts.length) : 0)
+    : t.set ? Math.max(0, Math.min(100, Math.floor((t.actual || 0) * 100 / t.set))) : 0);
+  const nm = v => (v === null || v === undefined ? "-" : String(Math.round(v * 10) / 10));   // torque, 1 decimal
   const isPlaced = t => t.x !== null && t.x !== undefined;
 
   // in setup mode every tool gets a position (dragged, from the template, or the centre);
@@ -39,7 +42,22 @@
   }
 
   // ---------------------------------------------------------------- render
+  // U-bolt group: set torque and the 4 nut torques, each nut green (>= set) or red
+  function ubCard(t) {
+    const cls = statusClass(t.status);
+    const nuts = (t.nuts || []).map((n, i) =>
+      `<span class="nut nut-${n.state}" title="Nut ${i + 1}">${esc(nm(n.value))}</span>`).join("");
+    return `<div class="tool-box tool-ub tool-${cls}" data-tag="${esc(t.tag)}">
+      <div class="tool-title" title="${esc(t.label)}">${esc(t.short)}: ${esc(t.label)}</div>
+      <div class="tool-meta">${t.status === "PENDING" ? `<span class="chip">${esc(t.note || "awaiting data")}</span>` : ""}</div>
+      <div class="tool-row"><span>Set Torque:</span><b>${t.set === null || t.set === undefined ? "-" : esc(nm(t.set)) + " Nm"}</b></div>
+      <div class="nuts">${nuts || '<span class="nut nut-pending">-</span>'.repeat(4)}</div>
+      <div class="bar"><i style="width:${pct(t)}%"></i></div>
+    </div>`;
+  }
+
   function card(t) {
+    if (t.kind === "ubolt") return ubCard(t);
     const cls = statusClass(t.status);
     return `<div class="tool-box tool-${cls}" data-tag="${esc(t.tag)}">
       <div class="tool-title" title="${esc(t.tag)}: ${esc(t.label)}">${esc(t.tag)}: ${esc(t.label)}</div>
@@ -56,8 +74,8 @@
   function marker(t) {
     const cls = statusClass(t.status) + (setup ? " marker-edit" : "");
     return `<button type="button" class="marker marker-${cls}" data-tag="${esc(t.tag)}"
-      style="left:${t.x}%;top:${t.y}%;--pct:${pct(t)}" title="${esc(t.tag)}: ${esc(t.label)}">
-      <span>${esc(t.tag)}</span></button>`;
+      style="left:${t.x}%;top:${t.y}%;--pct:${pct(t)}" title="${esc(t.short || t.tag)}: ${esc(t.label)}">
+      <span>${esc(t.short || t.tag)}</span></button>`;
   }
 
   function render() {

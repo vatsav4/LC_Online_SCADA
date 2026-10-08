@@ -11,7 +11,14 @@
   const $ = (id) => document.getElementById(id);
   // positions as the page sees them, also when the page is turned for a portrait screen
   const R = el => (window.logicalRect ? window.logicalRect(el) : el.getBoundingClientRect());
-  const portrait = () => document.documentElement.classList.contains("portrait");
+  // "upright": portrait screen and a top-view picture -> chassis turned upright, boxes left / right.
+  // Side-view pictures (wheels at the bottom) stay horizontal, as on a desktop.
+  const portrait = () => document.documentElement.classList.contains("upright");
+  function setUpright() {
+    const root = document.documentElement;
+    const on = root.classList.contains("portrait") && !st.side_view;
+    if (on !== root.classList.contains("upright")) root.classList.toggle("upright", on);
+  }
   let setup = false;   // true while a manager is editing positions
 
   let st = JSON.parse($("station-data").textContent || "{}");
@@ -123,6 +130,7 @@
   // the one at which the WIDEST picture (--widest-aspect in style.css) just fits.
   function fitToScreen() {
     const img = $("chassis-img"), view = $("station-view"), slot = $("chassis-slot"), box = $("chassis-box");
+    setUpright();
     if (!img || !img.naturalWidth) { drawLeaders(); return; }
     const css = getComputedStyle(document.documentElement);
     const widest = parseFloat(css.getPropertyValue("--widest-aspect")) || 3.72;
@@ -317,6 +325,7 @@
   // spa.js runs these when moving to another page, so listeners don't pile up
   window.__pageCleanups = window.__pageCleanups || [];
   window.__pageCleanups.push(() => {
+    document.documentElement.classList.remove("upright");
     window.removeEventListener("resize", fitToScreen);
     if (observer) observer.disconnect();
   });

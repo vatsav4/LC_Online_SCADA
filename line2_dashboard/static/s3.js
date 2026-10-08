@@ -111,7 +111,7 @@
     const svg = $("s3-rays"), view = $("station-view"), img = $("chassis-img");
     if (!svg || !view || !img) return;
     const vr = R(view), ir = R(img);
-    const upright = document.documentElement.classList.contains("portrait");
+    const upright = document.documentElement.classList.contains("upright");
     const p = n => Math.round(n * 10) / 10;
     const parts = [];
     view.querySelectorAll(".s3-curtain").forEach(dev => {

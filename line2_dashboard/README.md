@@ -162,6 +162,9 @@ the chassis upright with the boxes in a column on each side; the home page puts 
    For start after every PC restart: Win+R, `shell:startup`, put a shortcut to the .bat file there.
 4. Keep the PC awake: **Settings > System > Power** - screen and sleep: **Never** (when plugged in).
 
+Top-view chassis pictures (IMG_1 - IMG_3) stand upright on a portrait screen; side views (IMG_4, IMG_5 - listed in
+`SIDE_VIEW_IMAGES` in `app.py`) stay horizontal with the boxes above and below, as on a desktop.
+
 The level-of-control slides (`static/L3_Meaning.png`, `static/S3_Meaning.png`) are shown large on portrait screens:
 below the chassis on station pages (L3 for wrench / U-bolt / wheel stations, S3 for S3 controls, both in turn when a
 station has both or nothing), and the S3 slide between the photo and the station panel on the home page. On desktop screens the

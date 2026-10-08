@@ -618,8 +618,9 @@ html.rotated body { position: fixed; top: 0; left: 0; width: 100vh; height: 100v
 html.rot-270 body { -webkit-transform: rotate(-90deg) translateX(-100%); transform: rotate(-90deg) translateX(-100%); }
 html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform: rotate(90deg) translateY(-100%); }
 
-/* portrait: chassis upright in the middle, boxes in a column on each side */
-.portrait .station-view {
+/* portrait screen, top-view picture ("upright", set by station.js): chassis upright in the middle,
+   boxes in a column on each side. Side-view pictures (IMG_4, IMG_5) keep the desktop layout. */
+.upright .station-view {
   display: grid;
   grid-template-columns: minmax(var(--box-w), 1fr) auto minmax(var(--box-w), 1fr);
   grid-template-areas: "left chassis right";
@@ -627,50 +628,58 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
   column-gap: 1rem;
   padding: 1rem 0.75rem 1.4rem;
 }
-.portrait .callouts {
+.upright .callouts {
   min-height: 0;
   align-self: stretch;
   flex-direction: column;
   flex-wrap: nowrap;
   justify-content: space-evenly;
 }
-.portrait .callouts-top { grid-area: right; align-items: flex-start; }      /* top half of the picture */
-.portrait .callouts-bottom { grid-area: left; align-items: flex-end; }
-.portrait .chassis-slot { grid-area: chassis; margin: 0; max-width: none; }
-.portrait .chassis-box { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-.portrait .chassis-box img { max-width: none; }
-.portrait .marker span { transform: rotate(-90deg); }   /* T numbers stay readable */
+.upright .callouts-top { grid-area: right; align-items: flex-start; }      /* top half of the picture */
+.upright .callouts-bottom { grid-area: left; align-items: flex-end; }
+.upright .chassis-slot { grid-area: chassis; margin: 0; max-width: none; }
+.upright .chassis-box { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.upright .chassis-box img { max-width: none; }
+.upright .marker span { transform: rotate(-90deg); }   /* T numbers stay readable */
 .portrait .station-top { gap: 0.6rem; }
 .portrait .plate { min-width: 200px; padding-left: 1.2rem; padding-right: 1.2rem; }
 .portrait .plate-wide { min-width: 280px; }
 
 /* S3 devices on a portrait screen: curtains stand along the sides of the upright chassis */
-.portrait .s3-layer { grid-area: right; height: auto; margin-top: 0; align-self: stretch; align-items: center; }
-.portrait .s3-layer-bottom { grid-area: left; }
-.portrait .s3-curtain { width: auto; height: 62%; flex-direction: row-reverse; align-items: center; gap: 0.4rem; }
-.portrait .s3-layer-bottom .s3-curtain { flex-direction: row; }
-.portrait .lc-bar { width: 26px; height: 100%; flex-direction: column; }
-.portrait .lc-cap { width: auto; height: 26px; border-radius: 9px 9px 0 0; }
-.portrait .lc-cap:last-child { border-radius: 0 0 9px 9px; }
-.portrait .lc-body, .portrait .s3-layer-bottom .lc-body { border: 0; }
-.portrait .s3-layer-top .lc-body { border-left: 6px solid #1d232b; }        /* lens faces the chassis */
-.portrait .s3-layer-bottom .lc-body { border-right: 6px solid #1d232b; }
-.portrait .lc-led { right: auto; left: 50%; top: auto; bottom: 8px; margin: 0 0 0 -5px; }
-.portrait .lc-studs, .portrait .s3-layer-bottom .lc-studs {
+.upright .s3-layer { grid-area: right; height: auto; margin-top: 0; align-self: stretch; align-items: center; }
+.upright .s3-layer-bottom { grid-area: left; }
+.upright .s3-curtain { width: auto; height: 62%; flex-direction: row-reverse; align-items: center; gap: 0.4rem; }
+.upright .s3-layer-bottom .s3-curtain { flex-direction: row; }
+.upright .lc-bar { width: 26px; height: 100%; flex-direction: column; }
+.upright .lc-cap { width: auto; height: 26px; border-radius: 9px 9px 0 0; }
+.upright .lc-cap:last-child { border-radius: 0 0 9px 9px; }
+.upright .lc-body, .upright .s3-layer-bottom .lc-body { border: 0; }
+.upright .s3-layer-top .lc-body { border-left: 6px solid #1d232b; }        /* lens faces the chassis */
+.upright .s3-layer-bottom .lc-body { border-right: 6px solid #1d232b; }
+.upright .lc-led { right: auto; left: 50%; top: auto; bottom: 8px; margin: 0 0 0 -5px; }
+.upright .lc-studs, .upright .s3-layer-bottom .lc-studs {
   width: 7px; height: calc(100% - 52px); margin: 0; flex-direction: column;
 }
-.portrait .s3-layer-top .lc-studs { margin-right: -0.4rem; }
-.portrait .s3-layer-bottom .lc-studs { margin-left: -0.4rem; }
-.portrait .lc-studs i { width: auto; height: 5px; border-radius: 0; }
-.portrait .s3-tag { white-space: normal; flex-wrap: wrap; justify-content: center; max-width: 14rem; border-radius: 12px; }
-.portrait .s3-switch { bottom: auto; flex-direction: column-reverse; align-items: flex-end; }
-.portrait .s3-switch .ls { height: 100px; }
-.portrait .s3-layer-bottom .s3-switch { right: auto; left: 0; align-items: flex-start; }
+.upright .s3-layer-top .lc-studs { margin-right: -0.4rem; }
+.upright .s3-layer-bottom .lc-studs { margin-left: -0.4rem; }
+.upright .lc-studs i { width: auto; height: 5px; border-radius: 0; }
+.upright .s3-tag { white-space: normal; flex-wrap: wrap; justify-content: center; max-width: 14rem; border-radius: 12px; }
+.upright .s3-switch { bottom: auto; flex-direction: column-reverse; align-items: flex-end; }
+.upright .s3-switch .ls { height: 100px; }
+.upright .s3-layer-bottom .s3-switch { right: auto; left: 0; align-items: flex-start; }
 
-.portrait .s3-scanner { width: auto; height: 62%; flex-direction: row-reverse; align-items: center; gap: 0.4rem; }
-.portrait .s3-layer-bottom .s3-scanner { flex-direction: row; }
-.portrait .s3-layer-top .sc { transform: rotate(-90deg); }      /* right of the chassis: head left */
-.portrait .s3-layer-bottom .sc { transform: rotate(90deg); }    /* left of the chassis: head right */
+.upright .s3-scanner { width: auto; height: 62%; flex-direction: row-reverse; align-items: center; gap: 0.4rem; }
+.upright .s3-layer-bottom .s3-scanner { flex-direction: row; }
+.upright .s3-layer-top .sc { transform: rotate(-90deg); }      /* right of the chassis: head left */
+.upright .s3-layer-bottom .sc { transform: rotate(90deg); }    /* left of the chassis: head right */
+
+/* portrait screen, side-view picture: desktop layout, the spare height shared around the chassis */
+.portrait .content:not(.content-home) {
+  display: flex; flex-direction: column;
+  min-height: calc(var(--view-h, 100vh) - var(--topbar-h) - var(--footer-h));
+}
+.portrait .content:not(.content-home) > .station-view { width: 100%; }   /* auto margins would shrink it */
+.portrait:not(.upright) .station-view { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-evenly; }
 
 /* home page on a portrait screen: the whole line photo across the top, station panel below it */
 .portrait .home-hero {

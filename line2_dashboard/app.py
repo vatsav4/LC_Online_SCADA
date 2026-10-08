@@ -80,6 +80,9 @@ WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon das
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
 TOTAL_STATIONS = int(_get("MAIN", "total_stations", "17"))
 DEFAULT_IMAGE = "IMG_1.jpg"  # static/chassis/ picture for a station template that doesn't set one
+# side views (wheels at the bottom): on a portrait screen these stay horizontal instead of being
+# turned upright like the top views
+SIDE_VIEW_IMAGES = {"IMG_4.jpg", "IMG_5.jpg"}
 DEMO_MODE = _get("MAIN", "demo_mode", "false").strip().lower() in ("1", "true", "yes", "on")
 # Signs the login cookie. Empty = random at every start (managers just log in again after a restart).
 SECRET_KEY = _get("MAIN", "secret_key", "").strip() or secrets.token_hex(32)
@@ -465,6 +468,7 @@ def build_station(station_id, mapping, torques, s3=None, ubolts=None, wheels=Non
         "vc_number": vehicle.get("vc", ""),
         "mat_number": vehicle.get("mat", ""),
         "image": config["chassis_image"],
+        "side_view": config["chassis_image"] in SIDE_VIEW_IMAGES,
         "tools": tools,
         "s3": controls,
         "error": config["error"],

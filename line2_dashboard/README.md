@@ -164,8 +164,8 @@ the chassis upright with the boxes in a column on each side; the home page puts 
 
 The level-of-control slides (`static/L3_Meaning.png`, `static/S3_Meaning.png`) are shown large on portrait screens:
 below the chassis on station pages (L3 for wrench / U-bolt / wheel stations, S3 for S3 controls, both in turn when a
-station has both or nothing), and between the photo and the station panel on the home page. On desktop screens the
-home page shows both side by side, and every page has the two as click-to-enlarge thumbnails in the top bar.
+station has both or nothing), and the S3 slide between the photo and the station panel on the home page. On desktop screens the
+home page shows the S3 slide over the photo, and every page has both as click-to-enlarge thumbnails in the top bar.
 To change a slide, replace the PNG file with one of the same name.
 
 The mouse pointer hides itself after 4 s without movement. Close the full-screen page with Alt+F4 (click on it first).

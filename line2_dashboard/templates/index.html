@@ -7,11 +7,10 @@
 {% block content %}
 <!-- Home page: the line photo (static/Background.jpg) with the station panel on the right. -->
 <section class="home-hero" style="background-image: url('{{ url_for('static', filename='Background.jpg') }}')">
-  <!-- L3 / S3 level-of-control slides: side by side over the free part of the photo (landscape),
-       or one at a time between the photo and the station panel (portrait) -->
+  <!-- S3 level-of-control slide: over the free part of the photo (landscape),
+       or between the photo and the station panel (portrait) -->
   <div class="meaning-rotator home-meanings">
-    <img class="active" src="{{ url_for('static', filename='L3_Meaning.png') }}" alt="L1, L2 &amp; L3 Level of Control">
-    <img src="{{ url_for('static', filename='S3_Meaning.png') }}" alt="S1, S2 &amp; S3 Level of Control">
+    <img class="active" src="{{ url_for('static', filename='S3_Meaning.png') }}" alt="S1, S2 &amp; S3 Level of Control">
   </div>
   <aside class="home-panel">
     <div class="home-panel-title">Station Status</div>

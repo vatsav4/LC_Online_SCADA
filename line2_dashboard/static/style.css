@@ -20,8 +20,6 @@
   --red-dark: #b82a2a;
   --idle: #8a94a3;
   --amber: #f2c53d;
-  --wip: #f7c21a;        /* torques not finished yet (WIP / awaiting) */
-  --wip-dark: #a36c00;
   --blue: #2196c4;
   --ink: #16202b;
   --border: #d6dbe2;
@@ -185,7 +183,6 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 .home-summary { display: flex; gap: 1.1rem; margin: 0.45rem 0 0.35rem; font-size: 0.95rem; }
 .home-summary b { font-size: 1.35rem; margin-right: 0.2rem; }
 .sum-bad b { color: #ff7a7a; }
-.sum-wip b { color: var(--wip); }
 .sum-ok b { color: #5fdc7f; }
 .sum-idle b { color: #6cc6e6; }
 .home-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.75rem; color: #c9d3de; margin-bottom: 0.8rem; }
@@ -225,8 +222,6 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 
 .tile-green { background: var(--green); }
 .tile-red { background: var(--red); }
-.tile-wip { background: var(--wip); color: var(--ink); }
-.tile-wip .tile-count { background: rgba(0, 0, 0, 0.12); }
 .tile-idle { background: #1d86a8; }  /* teal like the slide's buttons */
 
 /* ---------- station detail (sized for a desktop screen, no scrolling) ---------- */
@@ -281,7 +276,6 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 }
 .ribbon-green { background: var(--green); }
 .ribbon-red { background: var(--red); animation: blink-box 1.4s infinite; }
-.ribbon-wip { background: var(--wip); color: var(--ink); }
 .ribbon-idle { background: var(--idle); }
 .ribbon-edit { background: var(--blue); }
 
@@ -339,10 +333,10 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 .leaders { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; overflow: visible; }
 .leader { fill: none; stroke-width: 2; stroke-linejoin: round; opacity: 0.85; transition: stroke-width 0.15s; }
 .leader-ok { stroke: var(--green-dark); fill: none; }
-.leader-bad { stroke: var(--wip-dark); fill: none; }
+.leader-bad { stroke: var(--red-dark); fill: none; }
 .leader-pending { stroke: var(--idle); fill: none; stroke-dasharray: 5 4; }
 .leader-end.leader-ok { fill: var(--green-dark); }
-.leader-end.leader-bad { fill: var(--wip-dark); }
+.leader-end.leader-bad { fill: var(--red-dark); }
 .leader-end.leader-pending { fill: var(--idle); }
 .leader.hl { stroke-width: 4; opacity: 1; }
 
@@ -373,15 +367,14 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
   border: 2px solid #fff;
 }
 .marker-ok { --ring: #fff; --dot: var(--green); }
-.marker-bad { --ring: #fff; --dot: var(--wip); }      /* torque not finished: yellow */
-.marker-bad span { color: var(--ink); }
+.marker-bad { --ring: #fff; --dot: var(--red); }
 .marker-pending { --ring: #fff; --dot: var(--idle); }
 .marker-bad::after {
   content: "";
   position: absolute;
   top: -6px; right: -6px; bottom: -6px; left: -6px;
   border-radius: 50%;
-  border: 3px solid var(--wip);
+  border: 3px solid var(--red);
   animation: marker-pulse 1.4s ease-out infinite;
 }
 @keyframes marker-pulse {
@@ -408,7 +401,7 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .tool-box.tool-ok { background: linear-gradient(180deg, #33c35a, var(--green)); }
-.tool-box.tool-bad { background: linear-gradient(180deg, #ffd23f, var(--wip)); }   /* WIP / awaiting */
+.tool-box.tool-bad { background: linear-gradient(180deg, #f04848, var(--red)); }
 .tool-box.tool-pending { background: repeating-linear-gradient(135deg, #b9c0ca 0 14px, #a6aeb9 14px 28px); }
 .tool-box.hl { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
 .tool-title {
@@ -417,7 +410,6 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 }
 /* awaiting data: a badge on the box's top edge, so it never covers the name */
 .tool-box { position: relative; }
-.chip-wip { background: var(--wip-dark); color: #fff; border-color: rgba(0, 0, 0, 0.4); }
 .tool-meta { position: absolute; top: -0.65rem; right: 0.8rem; display: flex; gap: 0.3rem; }
 .chip {
   font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.5rem; border-radius: 10px;
@@ -436,7 +428,7 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
   border-radius: 6px; padding: 0.05rem 0; border: 1px solid rgba(0, 0, 0, 0.25);
 }
 .nut-ok { background: rgba(255, 255, 255, 0.9); color: var(--green-dark); }
-.nut-bad { background: var(--wip-dark); color: #fff; }
+.nut-bad { background: var(--red-dark); color: #fff; }
 .nut-pending { background: rgba(255, 255, 255, 0.45); color: #556; }
 .tool-ub .bar { margin-top: 0.3rem; }
 /* 6 nuts (wheel): smaller numbers so they fit the box width */

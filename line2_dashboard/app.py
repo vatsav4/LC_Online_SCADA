@@ -476,9 +476,7 @@ def build_station(station_id, mapping, torques, s3=None, ubolts=None, wheels=Non
         "tools": tools,
         "s3": controls,
         "error": config["error"],
-        # red: an S3 control NOT OK; wip (yellow): torques not finished yet / data awaited; green: all OK
-        "status": ("idle" if not checks else "green" if all(t["status"] == "OK" for t in checks)
-                   else "red" if any(c["status"] == "NOT OK" for c in controls) else "wip"),
+        "status": "idle" if not checks else ("green" if all(t["status"] == "OK" for t in checks) else "red"),
         "version": APP_VERSION,
     }
 

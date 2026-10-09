@@ -10,15 +10,13 @@
   <aside class="home-panel">
     <div class="home-panel-title">Station Status</div>
     <div class="home-summary" id="home-summary">
-      <span class="sum-bad"><b>{{ stations|selectattr('status', 'equalto', 'red')|list|length }}</b> S3 NOT OK</span>
-      <span class="sum-wip"><b>{{ stations|selectattr('status', 'equalto', 'wip')|list|length }}</b> WIP</span>
+      <span class="sum-bad"><b>{{ stations|selectattr('status', 'equalto', 'red')|list|length }}</b> NOT OK</span>
       <span class="sum-ok"><b>{{ stations|selectattr('status', 'equalto', 'green')|list|length }}</b> OK</span>
       <span class="sum-idle"><b>{{ stations|selectattr('status', 'equalto', 'idle')|list|length }}</b> not set up</span>
     </div>
     <div class="home-legend">
       <span><i class="swatch tile-green"></i>All L3 &amp; S3 OK</span>
-      <span><i class="swatch tile-wip"></i>WIP / awaiting</span>
-      <span><i class="swatch tile-red"></i>S3 NOT OK</span>
+      <span><i class="swatch tile-red"></i>NOT OK / awaiting</span>
       <span><i class="swatch tile-idle"></i>Nothing set up</span>
       <span class="legend-note">L3 = torque wrenches · S3 = safety controls</span>
     </div>

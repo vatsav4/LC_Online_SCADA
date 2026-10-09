@@ -92,7 +92,7 @@ def test_build_station_statuses(known_templates):
     torques = {"T18": {"name": "ARB", "set": 4, "actual": 4, "bypass": True},
                "T23": {"name": "ARB 2", "set": 4, "actual": 1, "bypass": False}}
     st = line2.build_station(5, mapping, torques)
-    assert (st["vc_number"], st["mat_number"], st["status"]) == ("VC5", "MAT5", "wip")   # torque not done: yellow
+    assert (st["vc_number"], st["mat_number"], st["status"]) == ("VC5", "MAT5", "red")
     t18, t23 = st["tools"]
     assert (t18["status"], t18["label"]) == ("OK", "ARB bolt fitment")  # name from template
     assert "mode" not in t18   # bypass is not shown anywhere for now

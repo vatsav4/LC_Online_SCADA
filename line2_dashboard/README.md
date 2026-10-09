@@ -19,9 +19,8 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `UBolt_Data` (`Side`, `MAT_No`, set and 8 actual nut torques) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
 | `Wheel_Nut_Data` (`Side`, `MAT_No`, set and 12 actual nut torques) | `wincc/Wheel_To_SQL_Action.vbs` | wheel boxes (Station 15) |
 
-A wrench is **green** when Actual ≥ Set and **yellow** with "WIP / awaiting" (pulsing circle) when not yet. It's **grey**
-when the wrench has no row in the table yet. U-bolt and wheel nuts follow the same colours. Only an S3 control that is
-NOT OK shows **red**; on the home page a station tile is green (all OK), yellow (WIP / awaiting) or red (S3 NOT OK). A wrench whose **Set Count is 0** (not used for the vehicle model now at the station) is not shown and not
+A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
+table yet. A wrench whose **Set Count is 0** (not used for the vehicle model now at the station) is not shown and not
 counted; it still appears while a manager edits positions. The bypass state is not shown for now.
 
 An S3 control is **green** when its tag is 0 (OK) and **red** when it is 1 (NOT OK) - reversed for controls with

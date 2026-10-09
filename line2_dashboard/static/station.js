@@ -56,8 +56,7 @@
       `<span class="nut nut-${n.state}" title="Nut ${i + 1}">${esc(nm(n.value))}</span>`).join("");
     return `<div class="tool-box tool-ub tool-${cls}" data-tag="${esc(t.tag)}">
       <div class="tool-title" title="${esc(t.label)}">${esc(t.short)}: ${esc(t.label)}</div>
-      <div class="tool-meta">${t.status === "PENDING" ? `<span class="chip">${esc(t.note || "awaiting data")}</span>`
-        : t.status === "NOT OK" ? '<span class="chip chip-wip">WIP / awaiting</span>' : ""}</div>
+      <div class="tool-meta">${t.status === "PENDING" ? `<span class="chip">${esc(t.note || "awaiting data")}</span>` : ""}</div>
       <div class="tool-row"><span>Set Torque:</span><b>${t.set === null || t.set === undefined ? "-" : esc(nm(t.set)) + " Nm"}</b></div>
       <div class="nuts${(t.nut_count || 4) > 4 ? " nuts-many" : ""}">${nuts || '<span class="nut nut-pending">-</span>'.repeat(t.nut_count || 4)}</div>
       <div class="bar"><i style="width:${pct(t)}%"></i></div>
@@ -71,7 +70,6 @@
       <div class="tool-title" title="${esc(t.tag)}: ${esc(t.label)}">${esc(t.tag)}: ${esc(t.label)}</div>
       <div class="tool-meta">
         ${t.status === "PENDING" ? '<span class="chip">awaiting data</span>' : ""}
-        ${t.status === "NOT OK" ? '<span class="chip chip-wip">WIP / awaiting</span>' : ""}
         ${t.hidden ? '<span class="chip">Set Count 0 - not shown</span>' : ""}
       </div>
       <div class="tool-row"><span>Set Count:</span><b>${esc(show(t.set))}</b></div>
@@ -95,10 +93,9 @@
     const placed = all.filter(isPlaced), unplaced = all.filter(t => !isPlaced(t));
 
     const checks = all.concat(st.s3 || []);   // torque wrenches and S3 controls
-    // S3 control NOT OK = red; torques not done yet and anything without data = yellow "WIP / awaiting"
-    const s3bad = (st.s3 || []).filter(c => c.status === "NOT OK").length;
-    const wip = checks.filter(t => t.status !== "OK").length - s3bad;
-    const parts = [s3bad && `${s3bad} S3 NOT OK`, wip && `${wip} WIP / AWAITING`].filter(Boolean);
+    const bad = checks.filter(t => t.status === "NOT OK").length;
+    const waiting = checks.filter(t => t.status === "PENDING").length;
+    const parts = [bad && `${bad} NOT OK`, waiting && `${waiting} AWAITING DATA`].filter(Boolean);
     const rib = $("status-ribbon");
     if (st.error) { rib.className = "status-ribbon ribbon-red"; rib.textContent = "TEMPLATE MISTAKE - SEE ABOVE"; }
     else if (setup) { rib.className = "status-ribbon ribbon-edit"; rib.textContent = "EDITING POSITIONS"; }
@@ -110,7 +107,7 @@
       rib.className = "status-ribbon ribbon-green";
       rib.textContent = !all.length ? "ALL S3 CONTROLS OK" : (st.s3 || []).length ? "ALL OK" : "ALL TORQUES OK";
     }
-    else { rib.className = "status-ribbon " + (s3bad ? "ribbon-red" : "ribbon-wip"); rib.textContent = parts.join(" · "); }
+    else { rib.className = "status-ribbon " + (bad ? "ribbon-red" : "ribbon-idle"); rib.textContent = parts.join(" · "); }
 
     // Up to 3 boxes above and 3 below: circles in the top half of the picture get a box above,
     // the rest below; if one half has more than 3, the ones nearest the middle move to the other row.

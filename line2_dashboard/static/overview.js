@@ -16,7 +16,7 @@
       data.stations.forEach(st => {
         const el = document.getElementById("station-tile-" + st.id);
         if (!el) return;
-        el.classList.remove("tile-green", "tile-red", "tile-idle");
+        el.classList.remove("tile-green", "tile-red", "tile-wip", "tile-idle");
         el.classList.add("tile-" + st.status);
         // L3 / S3 counts; a wrench with Set Count 0 for this vehicle is left out by the server
         const set = (kind, show, text) => {
@@ -33,6 +33,7 @@
       const sum = document.getElementById("home-summary");
       if (sum) {
         sum.querySelector(".sum-bad b").textContent = count("red");
+        sum.querySelector(".sum-wip b").textContent = count("wip");
         sum.querySelector(".sum-ok b").textContent = count("green");
         sum.querySelector(".sum-idle b").textContent = count("idle");
       }

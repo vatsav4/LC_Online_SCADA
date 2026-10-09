@@ -4,7 +4,7 @@ Two independent global actions, each with its own SQL connection:
 
 - `Torques_To_SQL_Action.vbs`: torque wrench counts → `dbo.Torques_Actual_Data`
 - `S3_Controls_To_SQL_Action.vbs`: S3 controls (Station 7) → `dbo.S3_Controls_Data` ([see below](#s3-controls))
-- `UBolt_To_SQL_Action.vbs`: U-bolt nut torques (Station 6) → `dbo.UBolt_Data` ([see below](#u-bolt-tightening))
+- `UBolt_To_SQL_Action.vbs`: U-bolt nut torques of every vehicle (Station 6) → `dbo.UBolt_Vehicle_Data` ([see below](#u-bolt-tightening))
 - `Wheel_To_SQL_Action.vbs`: wheel nut torques (Station 15) → `dbo.Wheel_Nut_Data` ([see below](#wheel-nut-tightening))
 
 ## Torque wrench counts
@@ -107,56 +107,67 @@ Note: like any 2 s cyclic action, a signal that flips and returns within less th
 
 ## U-bolt tightening
 
-`UBolt_To_SQL_Action.vbs` follows the same safe pattern. Every 2 s it copies the tags of groups `UBOLT_LH` and
-`UBOLT_RH` into `dbo.UBolt_Data`, one row per side. The RH tags are the LH names with `LH` changed to `RH`.
+`UBolt_To_SQL_Action.vbs` follows the same safe pattern. Every 2 s it reads the tags of groups `UBOLT_LH` and
+`UBOLT_RH` and logs **every vehicle** into `dbo.UBolt_Vehicle_Data`: one row per vehicle (**MAT number**) and side.
+The RH tags are the LH names with `LH` changed to `RH`.
 
 | Column | From tag (LH; RH the same with `RH_`) |
 |---|---|
-| `Side` | `'LH'` / `'RH'` |
-| `MAT_No` | `LH_MAT_NO_Str` |
+| `MAT_No`, `Side` | `LH_MAT_NO_Str`, `'LH'` / `'RH'` (together the key) |
 | `VC_No` | `LH_VC_NO_Str_1` |
 | `Front_Set` | `LH_RF_IN_SET_TORQUE` |
 | `Rear_Set` | `LH_RR_IN_SET_TORQUE` |
 | `Front_1` … `Front_4` | `LH_ACT_FRONT_TORQUE_1` … `_4` |
 | `Rear_1` … `Rear_4` | `LH_ACT_REAR_TORQUE_1` … `_4` |
-| `Cycle_Complete` | `LH_CYCLE_COMPLETE` |
-| `Logged_At` | SQL Server time of the last write |
+| `Cycle_Complete` | `LH_CYCLE_COMPLETE` (once 1, it stays 1) |
+| `First_Logged`, `Logged_At` | SQL Server time of the first / last write |
 
-The torque tags are text like `+270.40`; they're stored as numbers.
+A vehicle's values stay fixed once it has been tightened:
+
+- a nut value is only written when it is above 0, so the PLC resetting the tags to 0 for the next vehicle never
+  wipes the finished one (a re-tightened nut gets its new value);
+- when a new MAT number appears, the values still on the tags are the previous vehicle's: each nut is ignored for
+  the new vehicle until its value changes (its first tightening on the new vehicle).
+
+The dashboard (Station 6) shows the row of the MAT number that `Station_Mapping` has for Station 6. The old
+`dbo.UBolt_Data` table is no longer used and can be dropped.
 
 ### Create the table (once)
 
 ```sql
-CREATE TABLE dbo.UBolt_Data (
-    Side           CHAR(2)       NOT NULL PRIMARY KEY,   -- 'LH' / 'RH'
-    MAT_No         NVARCHAR(40)  NULL,
+CREATE TABLE dbo.UBolt_Vehicle_Data (
+    MAT_No         NVARCHAR(40)  NOT NULL,
+    Side           CHAR(2)       NOT NULL,               -- 'LH' / 'RH'
     VC_No          NVARCHAR(40)  NULL,
     Front_Set      DECIMAL(9,2)  NULL,
     Rear_Set       DECIMAL(9,2)  NULL,
     Front_1 DECIMAL(9,2) NULL, Front_2 DECIMAL(9,2) NULL, Front_3 DECIMAL(9,2) NULL, Front_4 DECIMAL(9,2) NULL,
     Rear_1  DECIMAL(9,2) NULL, Rear_2  DECIMAL(9,2) NULL, Rear_3  DECIMAL(9,2) NULL, Rear_4  DECIMAL(9,2) NULL,
     Cycle_Complete BIT           NULL,
-    Logged_At      DATETIME2(0)  NULL
+    First_Logged   DATETIME2(0)  NULL,
+    Logged_At      DATETIME2(0)  NULL,
+    CONSTRAINT PK_UBolt_Vehicle_Data PRIMARY KEY (MAT_No, Side)
 );
 ```
 
 ### Install
 
-Same as the other scripts: VBS Editor → *Actions* → new action, paste `UBolt_To_SQL_Action.vbs` over the template,
-syntax check, Trigger **Cyclic 2 s**, save as `UBolt_To_SQL.bac`. Then set **`User ID` and `Password`** in `CONN_STR`.
+Replace the code of the existing `UBolt_To_SQL` action (VBS Editor: open it, select all, paste the new
+`UBolt_To_SQL_Action.vbs`, syntax check, save; the trigger stays **Cyclic 2 s**). Then set **`User ID` and
+`Password`** in `CONN_STR` again.
 
 ### Check
 
 ```sql
-SELECT * FROM dbo.UBolt_Data;
+SELECT TOP 20 * FROM dbo.UBolt_Vehicle_Data ORDER BY Logged_At DESC;
 ```
 
 If the table stays empty, open the **GSC Diagnostics** window in Runtime. The script names the problem there:
 `SQL write failed …` (login / table / network) or `LH not logged, tag not readable or bad quality: <tag>` (a tag name
-that doesn't exist, or a tag without a PLC connection).
+that doesn't exist, or a tag without a PLC connection). Nothing is logged while the MAT tag is empty.
 
-On the dashboard (Station 6) a nut is OK when its actual torque is at least **270 Nm** (fixed, `UBOLT_SET_TORQUE`
-in `app.py`; `Front_Set` / `Rear_Set` are logged but not used). The values are shown whatever `MAT_No` they belong to.
+On the dashboard a nut is OK when its actual torque is at least **270 Nm** (fixed, `UBOLT_SET_TORQUE` in `app.py`;
+`Front_Set` / `Rear_Set` are logged but not used). A nut not tightened yet on that vehicle shows `-`.
 
 ## Wheel nut tightening
 

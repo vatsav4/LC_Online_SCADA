@@ -8,8 +8,9 @@ Tables on the Line-2 SQL Server (reachable only on port 49561):
   dbo.S3_Controls_Data     Station_No, Tag_Name, Status, Changed_At
                            (one row per S3 control, 1 = NOT OK / 0 = OK,
                             written by wincc/S3_Controls_To_SQL_Action.vbs)
-  dbo.UBolt_Data           Side ('LH' / 'RH'), MAT_No, Front_Set, Rear_Set, Front_1..4, Rear_1..4, ...
-                           (U-bolt nut torques, written by wincc/UBolt_To_SQL_Action.vbs). A station
+  dbo.UBolt_Vehicle_Data   MAT_No, Side ('LH' / 'RH'), Front_1..4, Rear_1..4, ... - one row per vehicle
+                           and side (U-bolt nut torques, written by wincc/UBolt_To_SQL_Action.vbs); a
+                           station shows the row of the MAT number Station_Mapping has for it. A station
                            template lists a U-bolt group as a tool: {"t_no": "UBOLT_LH_FRONT", ...}.
   dbo.Wheel_Nut_Data       Side, MAT_No, Set_Torque, Front_1..6, Rear_1..6, ... (wheel nut torques,
                            written by wincc/Wheel_To_SQL_Action.vbs); tools "WHEEL_LH_FRONT", ...
@@ -105,7 +106,7 @@ state = {
     "mapping": {},   # {station_no: {"vc": .., "mat": ..}}
     "torques": {},   # {"T1": {"name": .., "set": .., "actual": .., "bypass": bool}}
     "s3": {},        # {"INVERSION_OVER_TRAVEL": {"value": 0 / 1 / None, "changed": datetime}}
-    "ubolts": {},    # {"LH": {"mat": .., "front_set": .., "rear_set": .., "front": [4], "rear": [4]}}
+    "ubolts": {},    # {("MAT..", "LH"): {"mat": .., "front_set": .., "rear_set": .., "front": [4], "rear": [4]}}
     "wheels": {},    # same shape, 6 nuts per wheel, one set torque for front and rear
     "updated_at": None,
     "db_ok": False,
@@ -175,23 +176,25 @@ _ubolt_failed = False
 
 
 def fetch_ubolts(conn):
-    """U-bolt nut torques, one row per side; on its own like the S3 table."""
+    """U-bolt nut torques of the vehicles now on the line (MAT numbers in Station_Mapping),
+    one row per vehicle and side; on its own like the S3 table."""
     global _ubolt_failed
     try:
         cur = conn.cursor()
         cur.execute("SELECT Side, MAT_No, Front_Set, Rear_Set, Front_1, Front_2, Front_3, Front_4, "
-                    "Rear_1, Rear_2, Rear_3, Rear_4 FROM dbo.UBolt_Data")
+                    "Rear_1, Rear_2, Rear_3, Rear_4 FROM dbo.UBolt_Vehicle_Data "
+                    "WHERE MAT_No IN (SELECT MAT_Number FROM dbo.Station_Mapping)")
         rows = cur.fetchall()
     except Exception as e:
         if not _ubolt_failed:
-            logger.error(f"UBolt_Data not readable (U-bolt boxes show awaiting data): {e}")
+            logger.error(f"UBolt_Vehicle_Data not readable (U-bolt boxes show awaiting data): {e}")
         _ubolt_failed = True
         return {}
     _ubolt_failed = False
-    return {str(r[0]).strip().upper(): {"mat": str(r[1] or "").strip(), "front_set": _num(r[2]),
-                                        "rear_set": _num(r[3]), "front": [_num(v) for v in r[4:8]],
-                                        "rear": [_num(v) for v in r[8:12]]}
-            for r in rows if r[0]}
+    return {(str(r[1] or "").strip().upper(), str(r[0]).strip().upper()):
+            {"mat": str(r[1] or "").strip(), "front_set": _num(r[2]), "rear_set": _num(r[3]),
+             "front": [_num(v) for v in r[4:8]], "rear": [_num(v) for v in r[8:12]]}
+            for r in rows if r[0] and r[1]}
 
 
 _wheel_failed = False
@@ -238,10 +241,11 @@ def demo_tables():
           "INVERSION_OVER_TRAVEL": {"value": 0, "changed": since.replace(hour=6, minute=0, second=0)}}
     # U-bolts at station 6: LH done, RH rear being tightened nut by nut
     nuts = min(4, tick % 6)
-    ubolts = {"LH": {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
-                     "front": [270.4, 270.6, 270.7, 270.3], "rear": [270.5, 270.9, 271.2, 270.3]},
-              "RH": {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
-                     "front": [270.8, 268.1, 270.2, 270.5], "rear": [271.0] * nuts + [0] * (4 - nuts)}}
+    ubolts = {("MAT784062TFK13049", "LH"): {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
+                                            "front": [270.4, 270.6, 270.7, 270.3], "rear": [270.5, 270.9, 271.2, 270.3]},
+              ("MAT784062TFK13049", "RH"): {"mat": "MAT784062TFK13049", "front_set": 270, "rear_set": 270.3,
+                                            "front": [270.8, 268.1, 270.2, 270.5],
+                                            "rear": [271.0] * nuts + [None] * (4 - nuts)}}
     # wheel nuts at station 15: LH done, RH front has one low nut, RH rear being tightened
     wnuts = min(6, tick % 8)
     wheels = {"LH": {"mat": "MAT784062TFK13051", "front_set": 400, "rear_set": 400,
@@ -388,25 +392,26 @@ _NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
 _UBOLT = _NUT_GROUP   # older name
 
 # U-bolts: every nut is judged against this set torque (the logged set torques are not used);
-# None = use Front_Set / Rear_Set from dbo.UBolt_Data again.
+# None = use Front_Set / Rear_Set from dbo.UBolt_Vehicle_Data again.
 UBOLT_SET_TORQUE = 270
-# U-bolts: show the logged values whatever MAT number they belong to (True = only when the logged
-# MAT is the vehicle at the station, like the wheels).
-UBOLT_CHECK_MAT = False
+
 
 
 def _nut_group_tool(t, kind, side, end, rows, station_mat):
     """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
-    >= the set torque. Wheel values are only shown when the logged MAT number is the vehicle at this
-    station; U-bolt values always (UBOLT_CHECK_MAT), judged against UBOLT_SET_TORQUE."""
-    row = (rows or {}).get(side)
-    check_mat = kind != "UBOLT" or UBOLT_CHECK_MAT
+    >= the set torque. U-bolts: the row logged for the vehicle (MAT number) now at this station,
+    judged against UBOLT_SET_TORQUE. Wheels: the last values, only when their MAT number is the
+    vehicle at this station."""
+    if kind == "UBOLT":
+        row = (rows or {}).get((station_mat.strip().upper(), side)) if station_mat else None
+    else:
+        row = (rows or {}).get(side)
     note = ""
-    if row is None:
-        note = "awaiting data"
-    elif check_mat and not station_mat:
+    if not station_mat:
         note = "no MAT at station"
-    elif check_mat and row["mat"].upper() != station_mat.upper():
+    elif row is None:
+        note = "awaiting data"
+    elif row["mat"].upper() != station_mat.upper():
         note = "other vehicle"
     set_value = None if note else row[end.lower() + "_set"]
     if not note and kind == "UBOLT" and UBOLT_SET_TORQUE is not None:

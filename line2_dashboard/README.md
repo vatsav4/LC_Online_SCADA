@@ -16,7 +16,7 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | existing WinCC script `VB_S` | VC and MAT plates |
 | `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
 | `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
-| `UBolt_Data` (`Side`, `MAT_No`, set and 8 actual nut torques) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
+| `UBolt_Vehicle_Data` (`MAT_No`, `Side`, set and 8 actual nut torques; one row per vehicle) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
 | `Wheel_Nut_Data` (`Side`, `MAT_No`, set and 12 actual nut torques) | `wincc/Wheel_To_SQL_Action.vbs` | wheel boxes (Station 15) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the
@@ -92,8 +92,8 @@ List a U-bolt group as a tool in the station's template (see `station_6.html`):
 The groups are `UBOLT_LH_FRONT`, `UBOLT_LH_REAR`, `UBOLT_RH_FRONT` and `UBOLT_RH_REAR`. Each gets one circle (LF, LR,
 RF, RR) and one box with the set torque and its 4 nut torques. A nut is green when its actual torque is at least the
 set torque, and the box is green when all 4 are. Every nut is judged against a fixed set torque of **270 Nm**
-(`UBOLT_SET_TORQUE` in `app.py`; the logged set torques are not used), and the logged values are shown whatever MAT
-number they belong to (`UBOLT_CHECK_MAT = False`).
+(`UBOLT_SET_TORQUE` in `app.py`; the logged set torques are not used). The values shown are the ones logged for the
+vehicle (MAT number) that `Station_Mapping` has at the station, so they stay correct while vehicles move.
 
 ## Wheel nut tightening on a station
 

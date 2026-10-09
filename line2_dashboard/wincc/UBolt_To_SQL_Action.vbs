@@ -2,19 +2,25 @@
 ' WinCC V7.5 SP2 - Global Script (VBS) - GLOBAL ACTION "UBolt_To_SQL"
 ' Trigger: Cyclic, standard cycle "2 seconds".
 '
-' Copies the U-bolt tightening data (tag groups UBOLT_LH / UBOLT_RH) into
-' dbo.UBolt_Data, one row per side ('LH', 'RH'):
-'     MAT_No          <- LH_MAT_NO_Str            (RH_MAT_NO_Str)
-'     VC_No           <- LH_VC_NO_Str_1           (RH_VC_NO_Str_1)
+' Logs the U-bolt tightening of EVERY vehicle (tag groups UBOLT_LH / UBOLT_RH)
+' into dbo.UBolt_Vehicle_Data: one row per vehicle (MAT number) and side.
+'     MAT_No, Side    <- LH_MAT_NO_Str  + 'LH'    (RH_MAT_NO_Str + 'RH')
+'     VC_No           <- LH_VC_NO_Str_1
 '     Front_Set       <- LH_RF_IN_SET_TORQUE      (front set torque)
 '     Rear_Set        <- LH_RR_IN_SET_TORQUE      (rear set torque)
 '     Front_1..4      <- LH_ACT_FRONT_TORQUE_1..4 (actual nut torques)
 '     Rear_1..4       <- LH_ACT_REAR_TORQUE_1..4
-'     Cycle_Complete  <- LH_CYCLE_COMPLETE
-'     Logged_At       =  SQL Server time of the last write
+'     Cycle_Complete  <- LH_CYCLE_COMPLETE        (once 1, stays 1)
+'     First_Logged / Logged_At = SQL Server time of the first / last write
+' A vehicle's values stay fixed after its tightening:
+'   * a nut value is only written when it is above 0, so the PLC resetting the
+'     tags to 0 for the next vehicle never wipes the finished one
+'   * when a new MAT number appears, the values still on the tags belong to the
+'     previous vehicle: each nut is ignored for the new vehicle until its value
+'     changes (first tightening of the new vehicle)
 ' The torques are text tags like "+270.40"; they are stored as numbers
 ' (VBScript has no Val(), so the text is checked and written as it is).
-' A row is inserted the first time a side is seen and updated afterwards.
+' The dashboard shows the row of the MAT number that Station_Mapping has for the station.
 '
 ' Same safe pattern as Torques_To_SQL, with its OWN SQL connection.
 ' Fill in User ID and Password below.
@@ -81,7 +87,9 @@ Function action
 
     ' ---- 2. one IF EXISTS UPDATE / ELSE INSERT per changed side --------------------
     Dim tg, good, badTag, txt, vals(9), matV, vcV, cycV, sig, oldSig, setPart, colList, valList, batch, changed, k
-    Dim num, lastTrace
+    Dim num, lastTrace, zero, prevMat, firstRun, staleStr, stale, useV, mk
+    Set zero = New RegExp                                ' 0, 0.00, -0 ... = no tightening value
+    zero.Pattern = "^-?0+(\.0+)?$"
     ' a torque text like "+270.40" / "-0.5" / "270" -> written to SQL as it is (minus a leading +).
     ' (VBScript has no Val(); CDbl would depend on the Windows number format.)
     Set num = New RegExp
@@ -143,25 +151,74 @@ Function action
             End If
         End If
 
+        If good And matV = "" Then good = False          ' no vehicle number: nothing to log it against
+
         If good Then
-            sig = Join(vals, "|") & "|" & matV & "|" & vcV & "|" & cycV
+            ' A new MAT number: the values still on the tags are the previous vehicle's. Remember
+            ' them; each nut is ignored for this vehicle until its value changes. (Not on the first
+            ' run after Runtime start - then the values on the tags are this vehicle's.)
+            prevMat = "" : firstRun = False
+            Err.Clear
+            prevMat = CStr(HMIRuntime.DataSet("UBV_mat_" & sd).Value)
+            If Err.Number <> 0 Then firstRun = True
+            Err.Clear
+            If matV <> prevMat Then
+                staleStr = ""
+                If Not firstRun Then staleStr = Join(vals, "|")
+                HMIRuntime.DataSet("UBV_mat_" & sd).Value = matV
+                If Err.Number <> 0 Then
+                    Err.Clear
+                    HMIRuntime.DataSet.Add "UBV_mat_" & sd, matV
+                End If
+                Err.Clear
+                HMIRuntime.DataSet("UBV_stale_" & sd).Value = staleStr
+                If Err.Number <> 0 Then
+                    Err.Clear
+                    HMIRuntime.DataSet.Add "UBV_stale_" & sd, staleStr
+                End If
+            End If
+            staleStr = ""
+            staleStr = CStr(HMIRuntime.DataSet("UBV_stale_" & sd).Value)
+            Err.Clear
+            stale = Split(staleStr & "||||||||||", "|")
+            For i = 2 To UBound(NUM_TAGS)                     ' nut values (0, 1 = set torques)
+                If stale(i) <> "" And vals(i) = stale(i) Then
+                    vals(i) = "NULL"                          ' still the previous vehicle's value
+                Else
+                    stale(i) = ""                             ' changed once: from now on this vehicle's
+                End If
+            Next
+            staleStr = ""
+            For i = 0 To UBound(NUM_TAGS)
+                If i > 0 Then staleStr = staleStr & "|"
+                staleStr = staleStr & stale(i)
+            Next
+            HMIRuntime.DataSet("UBV_stale_" & sd).Value = staleStr
+            Err.Clear
+
+            sig = matV & "|" & Join(vals, "|") & "|" & vcV & "|" & cycV
             oldSig = ""
             oldSig = CStr(HMIRuntime.DataSet("UB_sig_" & sd).Value)
             Err.Clear
 
             If fullRefresh Or sig <> oldSig Then
-                setPart = "MAT_No = N'" & matV & "', VC_No = N'" & vcV & "', Cycle_Complete = " & cycV & _
-                          ", Logged_At = SYSDATETIME()"
-                colList = "Side, MAT_No, VC_No, Cycle_Complete, Logged_At"
-                valList = "'" & sd & "', N'" & matV & "', N'" & vcV & "', " & cycV & ", SYSDATETIME()"
+                mk = "MAT_No = N'" & matV & "' AND Side = '" & sd & "'"
+                setPart = "VC_No = N'" & vcV & "', Logged_At = SYSDATETIME()"
+                If cycV = "1" Then setPart = setPart & ", Cycle_Complete = 1"
+                colList = "MAT_No, Side, VC_No, Cycle_Complete, First_Logged, Logged_At"
+                valList = "N'" & matV & "', '" & sd & "', N'" & vcV & "', " & cycV & ", SYSDATETIME(), SYSDATETIME()"
                 For i = 0 To UBound(NUM_COLS)
-                    setPart = setPart & ", " & NUM_COLS(i) & " = " & vals(i)
+                    useV = vals(i)
+                    If useV <> "NULL" Then
+                        If zero.Test(useV) Or Left(useV, 1) = "-" Then useV = "NULL"   ' 0: keep what is stored
+                    End If
+                    If useV <> "NULL" Then setPart = setPart & ", " & NUM_COLS(i) & " = " & useV
                     colList = colList & ", " & NUM_COLS(i)
-                    valList = valList & ", " & vals(i)
+                    valList = valList & ", " & useV
                 Next
-                batch = batch & "IF EXISTS (SELECT 1 FROM dbo.UBolt_Data WHERE Side = '" & sd & "') " & _
-                        "UPDATE dbo.UBolt_Data SET " & setPart & " WHERE Side = '" & sd & "' " & _
-                        "ELSE INSERT INTO dbo.UBolt_Data (" & colList & ") VALUES (" & valList & ");" & vbCrLf
+                batch = batch & "IF EXISTS (SELECT 1 FROM dbo.UBolt_Vehicle_Data WHERE " & mk & ") " & _
+                        "UPDATE dbo.UBolt_Vehicle_Data SET " & setPart & " WHERE " & mk & _
+                        " ELSE INSERT INTO dbo.UBolt_Vehicle_Data (" & colList & ") VALUES (" & valList & ");" & vbCrLf
                 changed("UB_sig_" & sd) = sig
             End If
         End If

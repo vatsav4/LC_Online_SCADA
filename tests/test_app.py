@@ -145,8 +145,8 @@ def test_fetch_tables_reads_both_tables():
     assert mapping == {1: {"vc": "VC1", "mat": "MAT1"}}
     assert torques == {"T1": {"name": "SG", "set": 5, "actual": 3, "bypass": True}}
     assert s3 == {"INVERSION_OVER_TRAVEL": {"value": 1, "changed": None}, "X": {"value": None, "changed": None}}
-    assert ubolts == {"LH": {"mat": "MAT1", "front_set": 270, "rear_set": 270.3,
-                             "front": [270.4, 270.6, None, 0], "rear": [1, 2, 3, 4]}}
+    assert ubolts == {("MAT1", "LH"): {"mat": "MAT1", "front_set": 270, "rear_set": 270.3,
+                                       "front": [270.4, 270.6, None, 0], "rear": [1, 2, 3, 4]}}
     assert wheels == {"RH": {"mat": "MAT2", "front_set": 400, "rear_set": 400,
                              "front": [401, 402, 403, 404, 405, 406], "rear": [0, 0, 0, 0, 0, None]}}
 
@@ -167,23 +167,26 @@ def test_wheel_groups_have_six_nuts(known_templates):
     assert line2.build_station(15, {15: {"vc": "", "mat": "M2"}}, {}, {}, {}, wheels)["tools"][0]["note"] == "other vehicle"
 
 
-def test_ubolt_groups_show_any_vehicle_against_270(known_templates):
+def test_ubolt_groups_show_the_vehicle_at_the_station(known_templates):
     (known_templates / "station_6.html").write_text(
         '{% extends "station_base.html" %}{% set tools = [{"t_no": "ubolt_lh_front", "name": "LH Front"},'
         ' {"t_no": "UBOLT_RH_REAR", "name": ""}] %}')
-    ubolts = {"LH": {"mat": "MAT9", "front_set": 270, "rear_set": 270.3, "front": [270.4, 270, 269.9, 0],
-                     "rear": [0] * 4},
-              "RH": {"mat": "MAT9", "front_set": 270, "rear_set": 270.3, "front": [0] * 4, "rear": [270.3] * 4}}
+    # one row per vehicle (MAT) and side; MAT8 is the vehicle before, already done
+    ubolts = {("MAT9", "LH"): {"mat": "MAT9", "front_set": 999, "rear_set": 270.3, "front": [270.4, 270, 269.9, None],
+                               "rear": [None] * 4},
+              ("MAT9", "RH"): {"mat": "MAT9", "front_set": 270, "rear_set": 270.3, "front": [None] * 4, "rear": [270.3] * 4},
+              ("MAT8", "LH"): {"mat": "MAT8", "front_set": 270, "rear_set": 270.3, "front": [271] * 4, "rear": [271] * 4}}
     st = line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)
     lf, rr = st["tools"]
-    assert (lf["short"], lf["status"], [n["state"] for n in lf["nuts"]]) == ("LF", "NOT OK", ["ok", "ok", "bad", "bad"])
-    ubolts["LH"]["front_set"] = 999                    # logged set torques are not used: always 270
-    assert line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)["tools"][0]["set"] == 270
+    assert (lf["short"], lf["set"], lf["status"]) == ("LF", 270, "NOT OK")      # set torque always 270
+    assert [n["state"] for n in lf["nuts"]] == ["ok", "ok", "bad", "pending"]
     assert (rr["short"], rr["label"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", "OK", 4)
-    other = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]   # other MAT: shown anyway
-    assert (other["status"], other["note"], len(other["nuts"])) == ("NOT OK", "", 4)
-    assert line2.build_station(6, {}, {}, {}, ubolts)["tools"][1]["status"] == "OK"            # no MAT at station
-    assert line2.build_station(6, {6: {"vc": "", "mat": "MAT9"}}, {}, {}, {})["tools"][0]["note"] == "awaiting data"
+    # the vehicle before (MAT8) at the station: its own values
+    lf8 = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]
+    assert (lf8["status"], [n["value"] for n in lf8["nuts"]]) == ("OK", [271] * 4)
+    # a vehicle with nothing logged yet / no MAT at the station
+    assert line2.build_station(6, {6: {"vc": "", "mat": "MAT7"}}, {}, {}, ubolts)["tools"][0]["note"] == "awaiting data"
+    assert line2.build_station(6, {}, {}, {}, ubolts)["tools"][0]["note"] == "no MAT at station"
 
 
 def test_missing_s3_table_does_not_stop_torques():

@@ -1,9 +1,9 @@
 {% extends "station_base.html" %}
 {#
-  U-bolt groups (logged by wincc/UBolt_To_SQL_Action.vbs into dbo.UBolt_Data):
+  U-bolt groups (logged per vehicle by wincc/UBolt_To_SQL_Action.vbs into dbo.UBolt_Vehicle_Data):
     UBOLT_LH_FRONT, UBOLT_LH_REAR, UBOLT_RH_FRONT, UBOLT_RH_REAR
-  One box / circle per group with its 4 nut torques; a nut is OK when actual >= set torque.
-  Shown only when the U-bolt MAT number is the vehicle at this station (Station_Mapping).
+  One box / circle per group with its 4 nut torques; a nut is OK when actual >= 270 Nm.
+  The values shown are those logged for the vehicle (MAT number) Station_Mapping has at this station.
   LH is the bottom side of the picture, RH the top (same as the Station 7 area scanners).
   Positions below are a first guess - a manager can drag them onto the springs.
 #}

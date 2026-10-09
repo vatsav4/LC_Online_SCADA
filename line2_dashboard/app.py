@@ -387,26 +387,30 @@ def _since(changed):
 _NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
 _UBOLT = _NUT_GROUP   # older name
 
-# TEMPORARY: LH_RF_IN_SET_TORQUE (LH front set torque) gives wrong values, so the LH front
-# box uses the RH front set torque instead. Delete this line once the LH tag is fixed.
-UBOLT_SET_FROM = {("LH", "FRONT"): ("RH", "FRONT")}
+# U-bolts: every nut is judged against this set torque (the logged set torques are not used);
+# None = use Front_Set / Rear_Set from dbo.UBolt_Data again.
+UBOLT_SET_TORQUE = 270
+# U-bolts: show the logged values whatever MAT number they belong to (True = only when the logged
+# MAT is the vehicle at the station, like the wheels).
+UBOLT_CHECK_MAT = False
 
 
 def _nut_group_tool(t, kind, side, end, rows, station_mat):
     """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
-    >= the set torque. Values are only shown when the logged MAT number is the vehicle at this station."""
+    >= the set torque. Wheel values are only shown when the logged MAT number is the vehicle at this
+    station; U-bolt values always (UBOLT_CHECK_MAT), judged against UBOLT_SET_TORQUE."""
     row = (rows or {}).get(side)
+    check_mat = kind != "UBOLT" or UBOLT_CHECK_MAT
     note = ""
     if row is None:
         note = "awaiting data"
-    elif not station_mat:
+    elif check_mat and not station_mat:
         note = "no MAT at station"
-    elif row["mat"].upper() != station_mat.upper():
+    elif check_mat and row["mat"].upper() != station_mat.upper():
         note = "other vehicle"
     set_value = None if note else row[end.lower() + "_set"]
-    if not note and kind == "UBOLT" and (side, end) in UBOLT_SET_FROM:   # set torque taken from the other side
-        from_side, from_end = UBOLT_SET_FROM[(side, end)]
-        set_value = ((rows or {}).get(from_side) or {}).get(from_end.lower() + "_set")
+    if not note and kind == "UBOLT" and UBOLT_SET_TORQUE is not None:
+        set_value = UBOLT_SET_TORQUE
     nuts = []
     for v in ([] if note else row[end.lower()]):
         state = "pending" if v is None or set_value is None else ("ok" if v >= set_value else "bad")

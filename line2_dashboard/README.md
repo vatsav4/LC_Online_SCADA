@@ -91,9 +91,9 @@ List a U-bolt group as a tool in the station's template (see `station_6.html`):
 
 The groups are `UBOLT_LH_FRONT`, `UBOLT_LH_REAR`, `UBOLT_RH_FRONT` and `UBOLT_RH_REAR`. Each gets one circle (LF, LR,
 RF, RR) and one box with the set torque and its 4 nut torques. A nut is green when its actual torque is at least the
-set torque, and the box is green when all 4 are. The values are only shown when the U-bolt MAT number matches the
-station's MAT in `Station_Mapping`. Otherwise the box is grey with "other vehicle" (or "no MAT at station" if
-`Station_Mapping` has no MAT for the station).
+set torque, and the box is green when all 4 are. Every nut is judged against a fixed set torque of **270 Nm**
+(`UBOLT_SET_TORQUE` in `app.py`; the logged set torques are not used), and the logged values are shown whatever MAT
+number they belong to (`UBOLT_CHECK_MAT = False`).
 
 ## Wheel nut tightening on a station
 
@@ -167,8 +167,7 @@ Top-view chassis pictures (IMG_1 - IMG_3) stand upright on a portrait screen; si
 
 The level-of-control slides (`static/L3_Meaning.png`, `static/S3_Meaning.png`) are shown large on portrait screens:
 below the chassis on station pages (L3 for wrench / U-bolt / wheel stations, S3 for S3 controls, both in turn when a
-station has both or nothing), and the S3 slide between the photo and the station panel on the home page. On desktop screens the
-home page shows the S3 slide over the photo, and every page has both as click-to-enlarge thumbnails in the top bar.
+station has both or nothing). On desktop screens every page has both as click-to-enlarge thumbnails in the top bar.
 To change a slide, replace the PNG file with one of the same name.
 
 The mouse pointer hides itself after 4 s without movement. Close the full-screen page with Alt+F4 (click on it first).

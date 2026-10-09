@@ -161,12 +161,13 @@ def test_wheel_groups_have_six_nuts(known_templates):
     lf, rr = line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"]
     assert (lf["label"], lf["nut_count"], lf["status"], lf["done"]) == ("LH Front Wheel", 6, "OK", 6)
     assert (rr["short"], rr["status"], rr["done"]) == ("RR", "NOT OK", 1)
-    # the temporary U-bolt set-torque swap doesn't touch wheels
+    # the fixed U-bolt set torque doesn't touch wheels, and wheels still need the station's MAT
     wheels["LH"]["front_set"] = 999
     assert line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"][0]["set"] == 999
+    assert line2.build_station(15, {15: {"vc": "", "mat": "M2"}}, {}, {}, {}, wheels)["tools"][0]["note"] == "other vehicle"
 
 
-def test_ubolt_groups_need_the_station_mat(known_templates):
+def test_ubolt_groups_show_any_vehicle_against_270(known_templates):
     (known_templates / "station_6.html").write_text(
         '{% extends "station_base.html" %}{% set tools = [{"t_no": "ubolt_lh_front", "name": "LH Front"},'
         ' {"t_no": "UBOLT_RH_REAR", "name": ""}] %}')
@@ -176,12 +177,12 @@ def test_ubolt_groups_need_the_station_mat(known_templates):
     st = line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)
     lf, rr = st["tools"]
     assert (lf["short"], lf["status"], [n["state"] for n in lf["nuts"]]) == ("LF", "NOT OK", ["ok", "ok", "bad", "bad"])
-    ubolts["LH"]["front_set"] = 999                    # wrong LH front set torque: the RH front one is used
+    ubolts["LH"]["front_set"] = 999                    # logged set torques are not used: always 270
     assert line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)["tools"][0]["set"] == 270
     assert (rr["short"], rr["label"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", "OK", 4)
-    other = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]
-    assert (other["status"], other["note"], other["nuts"]) == ("PENDING", "other vehicle", [])
-    assert line2.build_station(6, {}, {}, {}, ubolts)["tools"][0]["note"] == "no MAT at station"
+    other = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]   # other MAT: shown anyway
+    assert (other["status"], other["note"], len(other["nuts"])) == ("NOT OK", "", 4)
+    assert line2.build_station(6, {}, {}, {}, ubolts)["tools"][1]["status"] == "OK"            # no MAT at station
     assert line2.build_station(6, {6: {"vc": "", "mat": "MAT9"}}, {}, {}, {})["tools"][0]["note"] == "awaiting data"
 
 

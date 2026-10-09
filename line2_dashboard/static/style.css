@@ -113,14 +113,6 @@ html.rotated .meanings-overlay img { width: 90vh; max-height: 88vw; }   /* turne
 .meaning-rotator > img.active { opacity: 1; }
 .meaning-rotator img { border-radius: 10px; background: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
 
-/* home page, landscape: the S3 slide over the free (left) part of the line photo */
-.home-meanings { position: absolute; left: 2.5%; bottom: calc(var(--footer-h) + 2.5vh); display: flex; gap: 1rem; }
-.home-meanings > img { opacity: 1; width: 700px; width: min(40vw, 780px); height: auto; }
-/* home page, portrait: full width between the photo and the station panel */
-.portrait .home-meanings { position: static; display: grid; margin-top: 49%; }
-.portrait .home-meanings > img { width: 100%; opacity: 0; }
-.portrait .home-meanings > img.active { opacity: 1; }
-
 /* station pages, portrait (kiosk): slide below the chassis, a third of the page height at most */
 .station-meanings { display: none; }
 .portrait .station-meanings { display: grid; justify-content: center; margin: 0.6rem auto 0; }
@@ -691,10 +683,9 @@ html.rot-90 body { -webkit-transform: rotate(90deg) translateY(-100%); transform
   background-position: center top;
   background-repeat: no-repeat;
 }
-/* Background.jpg is 2:1, so it is half the page width high; the slides (.home-meanings) start just
-   above its bottom edge (vertical % margins are taken from the width; the content box is 94 % of it),
-   the station panel fills the rest */
-.portrait .home-panel { width: 100%; height: auto; flex: 1; margin-top: 0.8rem; min-height: 0; }
+/* Background.jpg is 2:1, so it is half the page width high; the station panel starts just above its
+   bottom edge (vertical % margins are taken from the width; the content box is 94 % of it) */
+.portrait .home-panel { width: 100%; height: auto; flex: 1; margin-top: 49%; min-height: 0; }
 .portrait .station-grid { gap: 0.6rem; }
 
 /* narrower boxes on a portrait screen */

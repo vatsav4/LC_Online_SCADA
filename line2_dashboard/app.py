@@ -76,6 +76,10 @@ LINE_DB = {
 }
 
 ODBC_DRIVER = _get("ODBC", "driver", "ODBC Driver 18 for SQL Server")
+# Encrypted connection: the newer drivers (ODBC Driver 17 / 18) use it; the old built-in Windows
+# "SQL Server" driver connects unencrypted, like the WinCC scripts. "yes" / "no" in config.ini overrides.
+ODBC_ENCRYPT = _get("ODBC", "encrypt", "no" if ODBC_DRIVER.strip().lower() == "sql server" else "yes"
+                    ).strip().lower() in ("1", "true", "yes", "on")
 POLL_INTERVAL = float(_get("MAIN", "poll_interval", "2"))
 WEB_PORT = int(_get("MAIN", "web_port", "5001"))  # 5000 is the Line-3 andon dashboard
 LINE_TITLE = _get("MAIN", "line_title", "Line - 2 | Assembly Shop")
@@ -125,7 +129,7 @@ def connect(cfg):
         f"DATABASE={cfg['database']};"
         f"UID={cfg['username']};"
         f"PWD={cfg['password']};"
-        f"Encrypt=yes;TrustServerCertificate=yes;",
+        + ("Encrypt=yes;TrustServerCertificate=yes;" if ODBC_ENCRYPT else ""),
         timeout=5,
     )
 
@@ -671,6 +675,34 @@ def api_station(station_id):
     return jsonify({**build_station(station_id, *data), "db_ok": db_ok, "updated_at": updated_at})
 
 
+def check_sql():
+    """python app.py check-sql  ->  tries the SQL connection from config.ini and reads the tables once"""
+    try:
+        import pyodbc
+    except ImportError:
+        print("pyodbc is not installed: python -m pip install pyodbc")
+        return 1
+    print(f"ODBC drivers on this PC: {', '.join(pyodbc.drivers()) or '(none)'}")
+    print(f"Connecting to {LINE_DB['server']},{LINE_DB['port']} / {LINE_DB['database']} as {LINE_DB['username']} "
+          f"with '{ODBC_DRIVER}' (encrypted: {'yes' if ODBC_ENCRYPT else 'no'}) ...")
+    try:
+        conn = connect(LINE_DB)
+    except Exception as e:
+        print(f"\nNOT CONNECTED: {e}")
+        return 1
+    try:
+        mapping, torques, s3, ubolts, wheels = fetch_tables(conn)
+    except Exception as e:
+        print(f"\nConnected, but reading the tables failed: {e}")
+        return 1
+    finally:
+        conn.close()
+    print(f"\nOK. Station_Mapping: {len(mapping)} stations, Torques_Actual_Data: {len(torques)} wrenches, "
+          f"S3 controls: {len(s3)}, U-bolt rows: {len(ubolts)}, wheel rows: {len(wheels)}")
+    print("(a missing S3 / U-bolt / wheel table only gives a message above and 0 here)")
+    return 0
+
+
 def hash_password():
     """python app.py hash-password  ->  prints a line to paste under [MANAGERS] in config.ini"""
     username = input("Manager username: ").strip().lower()
@@ -686,5 +718,7 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["hash-password"]:
         hash_password()
         sys.exit(0)
+    if sys.argv[1:] == ["check-sql"]:
+        sys.exit(check_sql())
     threading.Thread(target=poll_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=WEB_PORT, threaded=True)

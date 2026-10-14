@@ -197,7 +197,11 @@ SQL Server over the plant network (`172.25.208.39`, port `49561`). Only the inst
    `line2_dashboard` folder (e.g. to `C:\Line2Dashboard`), put `config.ini` into it, run
    `offline\2_Install_On_New_PC.bat`.
 4. Check the SQL Server can be reached (PowerShell): `Test-NetConnection 172.25.208.39 -Port 49561` must say
-   `TcpTestSucceeded : True`.
+   `TcpTestSucceeded : True`. Then, in the `line2_dashboard` folder, `python app.py check-sql` tries the login from
+   `config.ini` and reads the tables once (it prints `OK. ...` or the SQL error).
+
+   No "ODBC Driver 17/18 for SQL Server" on the PC (PowerShell: `Get-OdbcDriver -Platform 64-bit`)? The old built-in
+   driver works too, unencrypted like the WinCC scripts: in `config.ini` under `[ODBC]` set `driver = SQL Server`.
 5. Start `Run_Dashboard.bat` (it restarts the dashboard if it ever stops) and open `http://localhost:5001/`.
    For start after every restart: Win+R, `shell:startup`, put shortcuts to `Run_Dashboard.bat` (and, for the
    standee, `standee\Start_Standee.bat`) there.

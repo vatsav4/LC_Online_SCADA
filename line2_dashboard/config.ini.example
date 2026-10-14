@@ -10,7 +10,11 @@ username = CHANGE_ME
 password = CHANGE_ME
 
 [ODBC]
+; Which SQL Server ODBC driver this PC has (PowerShell: Get-OdbcDriver -Platform 64-bit).
+; ODBC Driver 18 for SQL Server / ODBC Driver 17 for SQL Server, or the old built-in one: SQL Server
 driver = ODBC Driver 18 for SQL Server
+; Encrypted connection: yes / no. Left out: no for the old "SQL Server" driver, yes for 17 / 18.
+; encrypt = no
 
 [MAIN]
 poll_interval = 2

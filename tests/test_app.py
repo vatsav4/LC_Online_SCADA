@@ -202,6 +202,11 @@ def test_connection_string_uses_comma_port(monkeypatch):
                         types.SimpleNamespace(connect=lambda s, timeout: captured.setdefault("s", s)))
     line2.connect({"server": "10.0.0.5", "port": "49561", "database": "d", "username": "u", "password": "p"})
     assert "SERVER=10.0.0.5,49561;" in captured["s"]
+    assert "Encrypt=yes" in captured["s"]
+    monkeypatch.setattr(line2, "ODBC_ENCRYPT", False)          # e.g. the old built-in "SQL Server" driver
+    captured.clear()
+    line2.connect({"server": "10.0.0.5", "port": "49561", "database": "d", "username": "u", "password": "p"})
+    assert "Encrypt" not in captured["s"]
 
 
 @pytest.fixture

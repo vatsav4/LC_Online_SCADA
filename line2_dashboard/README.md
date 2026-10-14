@@ -43,6 +43,8 @@ static/s3.js                 S3 devices drawn around the chassis (area scanner, 
 static/chassis/              chassis pictures, one per stage (IMG_1..IMG_5.jpg)
 static/Background.jpg        line photo behind the home page's station buttons
 static/logo.png              logo in the top bar
+Run_Dashboard.bat            starts app.py on Windows and restarts it if it stops
+offline/                     batch files to install on a PC without internet (see "New PC without internet")
 standee/Start_Standee.bat    opens the dashboard full screen on the standee (PC with HDMI to the standee)
 wincc/                       the WinCC VBScripts that fill Torques_Actual_Data and S3_Controls_Data
 ```
@@ -179,6 +181,28 @@ With only one screen, mirroring turns the laptop's own view too, so a separate s
 
 Unattended screens reload themselves when the dashboard is restarted (e.g. after an update), and keep retrying
 while the PC or network is down.
+
+## New PC without internet
+
+The pages load nothing from the internet, so the dashboard runs fine offline. The PC only has to reach the Line-2
+SQL Server over the plant network (`172.25.208.39`, port `49561`). Only the installation needs preparing:
+
+1. **On a PC with internet** (Windows 64-bit, Python installed): run `offline\1_Download_On_Internet_PC.bat`. It
+   downloads Flask and pyodbc into `offline\wheels`. Set `PYVER` at its top to the Python version you will install
+   on the new PC (e.g. `3.12`). Also download the **Python 64-bit installer** (same version) and the
+   **Microsoft ODBC Driver 18 for SQL Server** x64 `.msi`.
+2. Copy the whole `line2_dashboard` folder, the two installers and the current `config.ini` (it holds the SQL
+   user / password and manager logins, and is not in Git) to a USB stick.
+3. **On the new PC**: install Python (tick **"Add python.exe to PATH"**), install the ODBC driver, copy the
+   `line2_dashboard` folder (e.g. to `C:\Line2Dashboard`), put `config.ini` into it, run
+   `offline\2_Install_On_New_PC.bat`.
+4. Check the SQL Server can be reached (PowerShell): `Test-NetConnection 172.25.208.39 -Port 49561` must say
+   `TcpTestSucceeded : True`.
+5. Start `Run_Dashboard.bat` (it restarts the dashboard if it ever stops) and open `http://localhost:5001/`.
+   For start after every restart: Win+R, `shell:startup`, put shortcuts to `Run_Dashboard.bat` (and, for the
+   standee, `standee\Start_Standee.bat`) there.
+6. Only if other PCs must open it: allow port 5001 in the Windows firewall (as administrator):
+   `netsh advfirewall firewall add rule name="Line2 Dashboard" dir=in action=allow protocol=TCP localport=5001`.
 
 ## Run
 

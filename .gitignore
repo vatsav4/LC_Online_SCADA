@@ -5,3 +5,4 @@ __pycache__/
 line2_dashboard/config.ini
 line2_dashboard/templates/*.bak
 line2_dashboard/templates/*.tmp
+line2_dashboard/offline/wheels/

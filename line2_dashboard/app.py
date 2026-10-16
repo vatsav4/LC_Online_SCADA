@@ -465,7 +465,9 @@ def build_station(station_id, mapping, torques, s3=None, ubolts=None, wheels=Non
             "label": t["name"] or t["t_no"],  # name typed in the station template
             "x": t["x"], "y": t["y"],
             "set": (row or {}).get("set"),
-            "actual": (row or {}).get("actual"),
+            # more counts than set (extra tightenings) are shown as the set count: done = green
+            "actual": (min(row["actual"], row["set"]) if row and row["actual"] is not None and row["set"] is not None
+                       else (row or {}).get("actual")),
             # bypass state is still read from SQL (Active_Bypass) but not shown for now
             "status": status,
         })

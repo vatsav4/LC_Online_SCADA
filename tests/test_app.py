@@ -96,6 +96,9 @@ def test_build_station_statuses(known_templates):
     t18, t23 = st["tools"]
     assert (t18["status"], t18["label"]) == ("OK", "ARB bolt fitment")  # name from template
     assert "mode" not in t18   # bypass is not shown anywhere for now
+    torques["T18"]["actual"] = 7                       # more than set: shown as the set count, still OK
+    t18 = line2.build_station(5, mapping, torques)["tools"][0]
+    assert (t18["set"], t18["actual"], t18["status"]) == (4, 4, "OK")
     assert t23["status"] == "NOT OK"
     assert line2.build_station(5, mapping, {})["tools"][0]["status"] == "PENDING"
     assert line2.build_station(3, mapping, torques)["status"] == "idle"   # no template, nothing to check

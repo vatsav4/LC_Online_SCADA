@@ -93,8 +93,8 @@ List a U-bolt group as a tool in the station's template (see `station_6.html`):
 
 The groups are `UBOLT_LH_FRONT`, `UBOLT_LH_REAR`, `UBOLT_RH_FRONT` and `UBOLT_RH_REAR`. Each gets one circle (LF, LR,
 RF, RR) and one box with the set torque and its 4 nut torques. A nut is green when its actual torque is at least the
-set torque, and the box is green when all 4 are. Every nut is judged against a fixed set torque of **270 Nm**
-(`UBOLT_SET_TORQUE` in `app.py`; the logged set torques are not used). The values shown are the ones logged for the
+set torque, and the box is green when all 4 are. Front nuts use the set torque logged for the vehicle (`Front_Set`);
+rear nuts are judged against **270 Nm** for now (`UBOLT_SET_TORQUE = {"REAR": 270}` in `app.py`). The values shown are the ones logged for the
 vehicle (MAT number) that `Station_Mapping` has at the station, so they stay correct while vehicles move.
 
 ## Wheel nut tightening on a station

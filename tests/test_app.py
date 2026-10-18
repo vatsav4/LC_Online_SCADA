@@ -183,13 +183,16 @@ def test_ubolt_groups_show_the_vehicle_at_the_station(known_templates):
               ("MAT8", "LH"): {"mat": "MAT8", "front_set": 270, "rear_set": 270.3, "front": [271] * 4, "rear": [271] * 4}}
     st = line2.build_station(6, {6: {"vc": "", "mat": "mat9"}}, {}, {}, ubolts)
     lf, rr = st["tools"]
-    assert (lf["short"], lf["set"], lf["status"]) == ("LF", 270, "NOT OK")      # set torques from SQL
+    assert (lf["short"], lf["set"], lf["status"]) == ("LF", 270, "NOT OK")      # front set torque from SQL
     assert [n["state"] for n in lf["nuts"]] == ["ok", "ok", "bad", "pending"]
-    assert (rr["short"], rr["label"], rr["set"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", 270.3, "OK", 4)
-    # each box uses its own side's logged set torque (LH rear 999 doesn't touch RH rear)
+    # rear: fixed 270 for now (the logged 270.3 / 999 are not used)
+    assert (rr["short"], rr["label"], rr["set"], rr["status"], rr["done"]) == ("RR", "RH Rear U-bolt", 270, "OK", 4)
     lr = line2._nut_group_tool({"t_no": "UBOLT_LH_REAR", "name": "", "x": 0, "y": 0}, "UBOLT", "LH", "REAR",
                                ubolts, "MAT9")
-    assert lr["set"] == 999
+    assert lr["set"] == 270
+    # front from SQL: a different logged Front_Set is used as it is
+    ubolts[("MAT9", "LH")]["front_set"] = 271
+    assert line2.build_station(6, {6: {"vc": "", "mat": "MAT9"}}, {}, {}, ubolts)["tools"][0]["set"] == 271
     # the vehicle before (MAT8) at the station: its own values
     lf8 = line2.build_station(6, {6: {"vc": "", "mat": "MAT8"}}, {}, {}, ubolts)["tools"][0]
     assert (lf8["status"], [n["value"] for n in lf8["nuts"]]) == ("OK", [271] * 4)

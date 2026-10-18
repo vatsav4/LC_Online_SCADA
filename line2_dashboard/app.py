@@ -395,16 +395,17 @@ def _since(changed):
 _NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
 _UBOLT = _NUT_GROUP   # older name
 
-# U-bolts: None = each nut is judged against the set torque logged in SQL for that vehicle
-# (Front_Set / Rear_Set in dbo.UBolt_Data); a number (e.g. 270) = that set torque for all.
-UBOLT_SET_TORQUE = None
+# U-bolts: fixed set torque per end ("FRONT" / "REAR"), used instead of the one logged in SQL.
+# An end not listed here uses the set torque logged for that vehicle (Front_Set / Rear_Set in
+# dbo.UBolt_Data). {} = all from SQL; a single number (e.g. 270) = that set torque for all nuts.
+UBOLT_SET_TORQUE = {"REAR": 270}   # for now: rear 270 Nm, front from SQL
 
 
 
 def _nut_group_tool(t, kind, side, end, rows, station_mat):
     """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
     >= the set torque. U-bolts: the row logged for the vehicle (MAT number) now at this station,
-    judged against its logged Front_Set / Rear_Set (or UBOLT_SET_TORQUE if set). Wheels: always the last logged values, whatever vehicle
+    judged against its logged Front_Set / Rear_Set (or the UBOLT_SET_TORQUE value for that end). Wheels: always the last logged values, whatever vehicle
     (MAT number) Station_Mapping has at this station."""
     note = ""
     if kind == "UBOLT":
@@ -416,8 +417,10 @@ def _nut_group_tool(t, kind, side, end, rows, station_mat):
     if not note and row is None:
         note = "awaiting data"
     set_value = None if note else row[end.lower() + "_set"]
-    if not note and kind == "UBOLT" and UBOLT_SET_TORQUE is not None:
-        set_value = UBOLT_SET_TORQUE
+    if not note and kind == "UBOLT":
+        fixed = UBOLT_SET_TORQUE.get(end) if isinstance(UBOLT_SET_TORQUE, dict) else UBOLT_SET_TORQUE
+        if fixed is not None:
+            set_value = fixed
     nuts = []
     for v in ([] if note else row[end.lower()]):
         state = "pending" if v is None or set_value is None else ("ok" if v >= set_value else "bad")

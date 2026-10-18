@@ -169,8 +169,8 @@ If the table stays empty, open the **GSC Diagnostics** window in Runtime. The sc
 that doesn't exist, or a tag without a PLC connection). Nothing is logged while the MAT tag is empty.
 
 On the dashboard a nut is OK when its actual torque is at least the set torque logged for that vehicle
-(`Front_Set` / `Rear_Set`). To judge every nut against one fixed value instead, set `UBOLT_SET_TORQUE` in `app.py`
-(e.g. `270`). A nut not tightened yet on that vehicle shows `-`.
+(`Front_Set` / `Rear_Set`), except where `UBOLT_SET_TORQUE` in `app.py` fixes it: for now the rear nuts are judged
+against **270 Nm** (`{"REAR": 270}`); `{}` = all from SQL, `270` = 270 Nm for all. A nut not tightened yet on that vehicle shows `-`.
 
 ## Wheel nut tightening
 

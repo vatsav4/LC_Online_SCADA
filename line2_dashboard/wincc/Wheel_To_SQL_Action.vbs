@@ -12,8 +12,10 @@
 '     Cycle_Complete  <- W_LH_CYCLE_COMPLETE
 '     Logged_At       =  SQL Server time of the last write
 ' RH: the same names with LH -> RH (W_RH_MAT_NO, WRH_ACT_T.F_BOLT1, ...).
-' The nut torques are text tags like "+400.50"; they are stored as numbers
-' (VBScript has no Val(), so the text is checked and written as it is).
+' The nut torques are text tags like "401." / "+400.50" / "400.5 ..."; the number at
+' the start of the text is stored (VBScript has no Val(), so it is cut out with a
+' RegExp: "401." -> 401). Text without a number at the start -> NULL, and the tag is
+' named in GSC Diagnostics (at most once a minute).
 ' A row is inserted the first time a side is seen and updated afterwards.
 '
 ' Same safe pattern as Torques_To_SQL / UBolt_To_SQL, with its OWN SQL connection.
@@ -87,11 +89,11 @@ Function action
 
     ' ---- 2. one IF EXISTS UPDATE / ELSE INSERT per changed side --------------------
     Dim tg, good, badTag, txt, vals(12), matV, vcV, cycV, sig, oldSig, setPart, colList, valList, batch, changed, k
-    Dim num, lastTrace
-    ' a torque text like "+270.40" / "-0.5" / "270" -> written to SQL as it is (minus a leading +).
+    Dim num, m, lastTrace, badFmt
+    ' the number at the start of a torque text: "401." -> 401, "+400.50" -> 400.50, "400.5 xx" -> 400.5
     ' (VBScript has no Val(); CDbl would depend on the Windows number format.)
     Set num = New RegExp
-    num.Pattern = "^[+-]?[0-9]+(\.[0-9]+)?$"
+    num.Pattern = "^[+-]?[0-9]+(\.[0-9]+)?"
     Set changed = CreateObject("Scripting.Dictionary")
     batch = ""
     For Each sd In SIDES
@@ -99,6 +101,7 @@ Function action
         ' the Then branch - so every check is computed first, then tested.
         good = True
         badTag = ""
+        badFmt = ""
         For i = 0 To UBound(NUM_TAGS)
             Set tg = Nothing
             Err.Clear
@@ -112,13 +115,35 @@ Function action
             End If
             If Not good And badTag = "" Then badTag = Replace(NUM_TAGS(i), "#", sd)
             Err.Clear
-            If num.Test(txt) Then
-                If Left(txt, 1) = "+" Then txt = Mid(txt, 2)
-                vals(i) = txt
-            Else
-                vals(i) = "NULL"                             ' empty or not a number
+            vals(i) = "NULL"                                 ' empty or not a number
+            Set m = Nothing
+            Set m = num.Execute(txt)
+            If m Is Nothing Then
+                Err.Clear
+            ElseIf m.Count > 0 Then
+                vals(i) = m(0).Value
+                If Left(vals(i), 1) = "+" Then vals(i) = Mid(vals(i), 2)
+            ElseIf txt <> "" And badFmt = "" Then
+                badFmt = Replace(NUM_TAGS(i), "#", sd) & " = '" & txt & "'"
             End If
+            Err.Clear
         Next
+
+        ' say which torque text is not a number (at most once a minute)
+        If badFmt <> "" Then
+            lastTrace = 0
+            lastTrace = CDbl(HMIRuntime.DataSet("WN_LastFmt").Value)
+            Err.Clear
+            If nowS - lastTrace >= 60 Then
+                HMIRuntime.Trace "Wheel_To_SQL: " & sd & " torque text is not a number, stored as NULL: " & badFmt & vbCrLf
+                Err.Clear
+                HMIRuntime.DataSet("WN_LastFmt").Value = nowS
+                If Err.Number <> 0 Then
+                    Err.Clear
+                    HMIRuntime.DataSet.Add "WN_LastFmt", nowS
+                End If
+            End If
+        End If
 
         matV = "" : vcV = "" : cycV = "NULL"
         Err.Clear

@@ -189,6 +189,9 @@ Only the first 6 nuts of each wheel are logged.
 | `Cycle_Complete` | `W_LH_CYCLE_COMPLETE` |
 | `Logged_At` | SQL Server time of the last write |
 
+The nut torques are text tags like `401.` or `400.50`; the number at the start of the text is stored (`401.` → 401).
+A text that doesn't start with a number is stored as NULL and named in GSC Diagnostics.
+
 ### Create the table (once)
 
 ```sql
@@ -212,5 +215,5 @@ Same as the U-bolt script: new action, paste `Wheel_To_SQL_Action.vbs`, Trigger 
 `Wheel_To_SQL.bac`, set **`User ID` and `Password`** in `CONN_STR`. Then `SELECT * FROM dbo.Wheel_Nut_Data;`.
 If the table stays empty, the **GSC Diagnostics** window names the problem (SQL error, or the tag that can't be read).
 
-On the dashboard (Station 15) a nut is OK when its actual torque is at least the set torque; the values are only shown
-when `MAT_No` matches Station 15's `MAT_Number` in `Station_Mapping`.
+On the dashboard (Station 15) a nut is OK when its actual torque is at least the set torque; the last logged values
+are shown whatever MAT number is at Station 15 in `Station_Mapping`.

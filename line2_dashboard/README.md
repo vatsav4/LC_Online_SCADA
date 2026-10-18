@@ -16,7 +16,7 @@ On the Line-2 SQL Server, `172.25.208.39`, port **49561** (the app connects with
 | `Station_Mapping` (`StationNumber`, `VC_Number`, `MAT_Number`) | existing WinCC script `VB_S` | VC and MAT plates |
 | `Torques_Actual_Data` (`T_No`, `T_Name`, `Set_Counts`, `Actual_Counts`, `Active_Bypass`) | `wincc/Torques_To_SQL_Action.vbs` | one box and one circle per wrench |
 | `S3_Controls_Data` (`Station_No`, `Tag_Name`, `Status`, `Changed_At`) | `wincc/S3_Controls_To_SQL_Action.vbs` | S3 devices drawn around the chassis (Station 7) |
-| `UBolt_Vehicle_Data` (`MAT_No`, `Side`, set and 8 actual nut torques; one row per vehicle) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
+| `UBolt_Data` (`MAT_No`, `Side`, set and 8 actual nut torques; one row per vehicle) | `wincc/UBolt_To_SQL_Action.vbs` | U-bolt boxes (Station 6) |
 | `Wheel_Nut_Data` (`Side`, `MAT_No`, set and 12 actual nut torques) | `wincc/Wheel_To_SQL_Action.vbs` | wheel boxes (Station 15) |
 
 A wrench is **green** when Actual ≥ Set and **red** (pulsing circle) when not. It's **grey** when the wrench has no row in the

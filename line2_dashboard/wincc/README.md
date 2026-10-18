@@ -4,7 +4,7 @@ Two independent global actions, each with its own SQL connection:
 
 - `Torques_To_SQL_Action.vbs`: torque wrench counts → `dbo.Torques_Actual_Data`
 - `S3_Controls_To_SQL_Action.vbs`: S3 controls (Station 7) → `dbo.S3_Controls_Data` ([see below](#s3-controls))
-- `UBolt_To_SQL_Action.vbs`: U-bolt nut torques of every vehicle (Station 6) → `dbo.UBolt_Vehicle_Data` ([see below](#u-bolt-tightening))
+- `UBolt_To_SQL_Action.vbs`: U-bolt nut torques of every vehicle (Station 6) → `dbo.UBolt_Data` ([see below](#u-bolt-tightening))
 - `Wheel_To_SQL_Action.vbs`: wheel nut torques (Station 15) → `dbo.Wheel_Nut_Data` ([see below](#wheel-nut-tightening))
 
 ## Torque wrench counts
@@ -108,7 +108,7 @@ Note: like any 2 s cyclic action, a signal that flips and returns within less th
 ## U-bolt tightening
 
 `UBolt_To_SQL_Action.vbs` follows the same safe pattern. Every 2 s it reads the tags of groups `UBOLT_LH` and
-`UBOLT_RH` and logs **every vehicle** into `dbo.UBolt_Vehicle_Data`: one row per vehicle (**MAT number**) and side.
+`UBOLT_RH` and logs **every vehicle** into `dbo.UBolt_Data`: one row per vehicle (**MAT number**) and side.
 The RH tags are the LH names with `LH` changed to `RH`.
 
 | Column | From tag (LH; RH the same with `RH_`) |
@@ -129,13 +129,15 @@ A vehicle's values stay fixed once it has been tightened:
 - when a new MAT number appears, the values still on the tags are the previous vehicle's: each nut is ignored for
   the new vehicle until its value changes (its first tightening on the new vehicle).
 
-The dashboard (Station 6) shows the row of the MAT number that `Station_Mapping` has for Station 6. The old
-`dbo.UBolt_Data` table is no longer used and can be dropped.
+The dashboard (Station 6) shows the row of the MAT number that `Station_Mapping` has for Station 6.
+
+The table keeps the old name `dbo.UBolt_Data` but has the new layout (key `MAT_No` + `Side`): drop the old one-row-
+per-side `UBolt_Data` first, then create it as below.
 
 ### Create the table (once)
 
 ```sql
-CREATE TABLE dbo.UBolt_Vehicle_Data (
+CREATE TABLE dbo.UBolt_Data (
     MAT_No         NVARCHAR(40)  NOT NULL,
     Side           CHAR(2)       NOT NULL,               -- 'LH' / 'RH'
     VC_No          NVARCHAR(40)  NULL,
@@ -146,7 +148,7 @@ CREATE TABLE dbo.UBolt_Vehicle_Data (
     Cycle_Complete BIT           NULL,
     First_Logged   DATETIME2(0)  NULL,
     Logged_At      DATETIME2(0)  NULL,
-    CONSTRAINT PK_UBolt_Vehicle_Data PRIMARY KEY (MAT_No, Side)
+    CONSTRAINT PK_UBolt_Data PRIMARY KEY (MAT_No, Side)
 );
 ```
 
@@ -159,7 +161,7 @@ Replace the code of the existing `UBolt_To_SQL` action (VBS Editor: open it, sel
 ### Check
 
 ```sql
-SELECT TOP 20 * FROM dbo.UBolt_Vehicle_Data ORDER BY Logged_At DESC;
+SELECT TOP 20 * FROM dbo.UBolt_Data ORDER BY Logged_At DESC;
 ```
 
 If the table stays empty, open the **GSC Diagnostics** window in Runtime. The script names the problem there:

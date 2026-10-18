@@ -8,7 +8,7 @@ Tables on the Line-2 SQL Server (reachable only on port 49561):
   dbo.S3_Controls_Data     Station_No, Tag_Name, Status, Changed_At
                            (one row per S3 control, 1 = NOT OK / 0 = OK,
                             written by wincc/S3_Controls_To_SQL_Action.vbs)
-  dbo.UBolt_Vehicle_Data   MAT_No, Side ('LH' / 'RH'), Front_1..4, Rear_1..4, ... - one row per vehicle
+  dbo.UBolt_Data           MAT_No, Side ('LH' / 'RH'), Front_1..4, Rear_1..4, ... - one row per vehicle
                            and side (U-bolt nut torques, written by wincc/UBolt_To_SQL_Action.vbs); a
                            station shows the row of the MAT number Station_Mapping has for it. A station
                            template lists a U-bolt group as a tool: {"t_no": "UBOLT_LH_FRONT", ...}.
@@ -186,12 +186,12 @@ def fetch_ubolts(conn):
     try:
         cur = conn.cursor()
         cur.execute("SELECT Side, MAT_No, Front_Set, Rear_Set, Front_1, Front_2, Front_3, Front_4, "
-                    "Rear_1, Rear_2, Rear_3, Rear_4 FROM dbo.UBolt_Vehicle_Data "
+                    "Rear_1, Rear_2, Rear_3, Rear_4 FROM dbo.UBolt_Data "
                     "WHERE MAT_No IN (SELECT MAT_Number FROM dbo.Station_Mapping)")
         rows = cur.fetchall()
     except Exception as e:
         if not _ubolt_failed:
-            logger.error(f"UBolt_Vehicle_Data not readable (U-bolt boxes show awaiting data): {e}")
+            logger.error(f"UBolt_Data not readable (U-bolt boxes show awaiting data): {e}")
         _ubolt_failed = True
         return {}
     _ubolt_failed = False
@@ -396,7 +396,7 @@ _NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
 _UBOLT = _NUT_GROUP   # older name
 
 # U-bolts: None = each nut is judged against the set torque logged in SQL for that vehicle
-# (Front_Set / Rear_Set in dbo.UBolt_Vehicle_Data); a number (e.g. 270) = that set torque for all.
+# (Front_Set / Rear_Set in dbo.UBolt_Data); a number (e.g. 270) = that set torque for all.
 UBOLT_SET_TORQUE = None
 
 

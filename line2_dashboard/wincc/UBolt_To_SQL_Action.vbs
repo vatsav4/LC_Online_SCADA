@@ -3,7 +3,7 @@
 ' Trigger: Cyclic, standard cycle "2 seconds".
 '
 ' Logs the U-bolt tightening of EVERY vehicle (tag groups UBOLT_LH / UBOLT_RH)
-' into dbo.UBolt_Vehicle_Data: one row per vehicle (MAT number) and side.
+' into dbo.UBolt_Data: one row per vehicle (MAT number) and side.
 '     MAT_No, Side    <- LH_MAT_NO_Str  + 'LH'    (RH_MAT_NO_Str + 'RH')
 '     VC_No           <- LH_VC_NO_Str_1
 '     Front_Set       <- LH_RF_IN_SET_TORQUE      (front set torque)
@@ -216,9 +216,9 @@ Function action
                     colList = colList & ", " & NUM_COLS(i)
                     valList = valList & ", " & useV
                 Next
-                batch = batch & "IF EXISTS (SELECT 1 FROM dbo.UBolt_Vehicle_Data WHERE " & mk & ") " & _
-                        "UPDATE dbo.UBolt_Vehicle_Data SET " & setPart & " WHERE " & mk & _
-                        " ELSE INSERT INTO dbo.UBolt_Vehicle_Data (" & colList & ") VALUES (" & valList & ");" & vbCrLf
+                batch = batch & "IF EXISTS (SELECT 1 FROM dbo.UBolt_Data WHERE " & mk & ") " & _
+                        "UPDATE dbo.UBolt_Data SET " & setPart & " WHERE " & mk & _
+                        " ELSE INSERT INTO dbo.UBolt_Data (" & colList & ") VALUES (" & valList & ");" & vbCrLf
                 changed("UB_sig_" & sd) = sig
             End If
         End If

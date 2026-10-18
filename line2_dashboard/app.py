@@ -395,16 +395,16 @@ def _since(changed):
 _NUT_GROUP = re.compile(r"^(UBOLT|WHEEL)_(LH|RH)_(FRONT|REAR)$")
 _UBOLT = _NUT_GROUP   # older name
 
-# U-bolts: every nut is judged against this set torque (the logged set torques are not used);
-# None = use Front_Set / Rear_Set from dbo.UBolt_Vehicle_Data again.
-UBOLT_SET_TORQUE = 270
+# U-bolts: None = each nut is judged against the set torque logged in SQL for that vehicle
+# (Front_Set / Rear_Set in dbo.UBolt_Vehicle_Data); a number (e.g. 270) = that set torque for all.
+UBOLT_SET_TORQUE = None
 
 
 
 def _nut_group_tool(t, kind, side, end, rows, station_mat):
     """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
     >= the set torque. U-bolts: the row logged for the vehicle (MAT number) now at this station,
-    judged against UBOLT_SET_TORQUE. Wheels: always the last logged values, whatever vehicle
+    judged against its logged Front_Set / Rear_Set (or UBOLT_SET_TORQUE if set). Wheels: always the last logged values, whatever vehicle
     (MAT number) Station_Mapping has at this station."""
     note = ""
     if kind == "UBOLT":

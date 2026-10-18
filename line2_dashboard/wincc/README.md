@@ -166,8 +166,9 @@ If the table stays empty, open the **GSC Diagnostics** window in Runtime. The sc
 `SQL write failed …` (login / table / network) or `LH not logged, tag not readable or bad quality: <tag>` (a tag name
 that doesn't exist, or a tag without a PLC connection). Nothing is logged while the MAT tag is empty.
 
-On the dashboard a nut is OK when its actual torque is at least **270 Nm** (fixed, `UBOLT_SET_TORQUE` in `app.py`;
-`Front_Set` / `Rear_Set` are logged but not used). A nut not tightened yet on that vehicle shows `-`.
+On the dashboard a nut is OK when its actual torque is at least the set torque logged for that vehicle
+(`Front_Set` / `Rear_Set`). To judge every nut against one fixed value instead, set `UBOLT_SET_TORQUE` in `app.py`
+(e.g. `270`). A nut not tightened yet on that vehicle shows `-`.
 
 ## Wheel nut tightening
 

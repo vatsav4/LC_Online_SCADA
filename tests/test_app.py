@@ -164,10 +164,12 @@ def test_wheel_groups_have_six_nuts(known_templates):
     lf, rr = line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"]
     assert (lf["label"], lf["nut_count"], lf["status"], lf["done"]) == ("LH Front Wheel", 6, "OK", 6)
     assert (rr["short"], rr["status"], rr["done"]) == ("RR", "NOT OK", 1)
-    # the fixed U-bolt set torque doesn't touch wheels, and wheels still need the station's MAT
+    # the fixed U-bolt set torque doesn't touch wheels, and wheels show whatever MAT is at the station
     wheels["LH"]["front_set"] = 999
     assert line2.build_station(15, {15: {"vc": "", "mat": "M1"}}, {}, {}, {}, wheels)["tools"][0]["set"] == 999
-    assert line2.build_station(15, {15: {"vc": "", "mat": "M2"}}, {}, {}, {}, wheels)["tools"][0]["note"] == "other vehicle"
+    for mapping in ({15: {"vc": "", "mat": "M2"}}, {}):
+        other = line2.build_station(15, mapping, {}, {}, {}, wheels)["tools"][0]
+        assert (other["status"], other["note"], other["set"]) == ("NOT OK", "", 999)
 
 
 def test_ubolt_groups_show_the_vehicle_at_the_station(known_templates):

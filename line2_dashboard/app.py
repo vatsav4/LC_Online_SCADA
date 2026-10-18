@@ -404,19 +404,17 @@ UBOLT_SET_TORQUE = 270
 def _nut_group_tool(t, kind, side, end, rows, station_mat):
     """One U-bolt (4 nuts) or wheel (6 nuts) as a station box. A nut is OK when its actual torque
     >= the set torque. U-bolts: the row logged for the vehicle (MAT number) now at this station,
-    judged against UBOLT_SET_TORQUE. Wheels: the last values, only when their MAT number is the
-    vehicle at this station."""
+    judged against UBOLT_SET_TORQUE. Wheels: always the last logged values, whatever vehicle
+    (MAT number) Station_Mapping has at this station."""
+    note = ""
     if kind == "UBOLT":
         row = (rows or {}).get((station_mat.strip().upper(), side)) if station_mat else None
+        if not station_mat:
+            note = "no MAT at station"
     else:
         row = (rows or {}).get(side)
-    note = ""
-    if not station_mat:
-        note = "no MAT at station"
-    elif row is None:
+    if not note and row is None:
         note = "awaiting data"
-    elif row["mat"].upper() != station_mat.upper():
-        note = "other vehicle"
     set_value = None if note else row[end.lower() + "_set"]
     if not note and kind == "UBOLT" and UBOLT_SET_TORQUE is not None:
         set_value = UBOLT_SET_TORQUE
